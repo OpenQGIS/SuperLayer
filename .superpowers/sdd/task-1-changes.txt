@@ -1,0 +1,5 @@
+Task 1 Changes Summary:
+- Created: icons/SuperLayer.svg
+- Created: icons/SuperLayer.png
+- Deleted: icons/TreeMap_Layer_Manager.svg
+- Deleted: icons/TreeMap_Layer_Manager.png

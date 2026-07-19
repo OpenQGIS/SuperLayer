@@ -1,0 +1,5 @@
+Task 2 Files Modified:
+- __init__.py
+- metadata.txt
+- main_plugin.py
+- dock_widget.py

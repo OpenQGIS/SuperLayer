@@ -1,0 +1,39 @@
+[general]
+name=SuperLayer
+qgisMinimumVersion=3.0
+description=使用列表、文件夹树、矩形树图或图层属性看板查看与管理工程图层，支持批量修改 CRS/可见比例尺/编码、原生样式编辑、空间索引创建及物理文件移动。
+version=1.3.0
+author=OpenQGIS
+email=OpenQGIS@outlook.com
+about=使用矩形树状图按文件大小查看 QGIS 图层，支持数据源更换、带样式物理文件复制，以及全功能图层属性看板（批量更新/样式/日志/导出）。
+tracker=https://github.com/google/antigravity/issues
+repository=https://github.com/google/antigravity
+category=Plugins
+icon=icons/SuperLayer.svg
+changelog=
+    Version 1.3.0:
+    * ✨ 新增全功能图层属性看板（属性看板页）：支持批量修改图层名称、数据源、CRS、可见比例尺范围及数据源字符编码。/ Added fully-featured Layer Board page to batch-update layer names, sources, CRS, scale visibility, and source encoding.
+    * ✨ 双击就地编辑与非法输入校验：表格内双击即可安全修改图层参数，支持黄色高亮标记脏单元格，并支持统一保存（Commit）或放弃修改（Discard）。/ Enabled cell double-click inline editing with validation, yellow unsaved highlight, and Commit/Discard logic.
+    * ✨ 原生图层样式面板深度嵌入：右侧面板动态载入 QGIS 原生的 RendererProperties 样式编辑器，优化最大宽度限制及并排对齐，一键应用并触发画布重绘。/ Embedded native QGIS style properties panel with standard layouts and trigger canvas redraws.
+    * ✨ 数据管理与日志审计：支持一键导出看板全部数据至 CSV，并在日志选项卡中异步输出带自动滚动的操作日志。/ Provided CSV data export and operations log output with auto-scrolling capability.
+    Version 1.2.0:
+    * ✨ 高分屏矢量高清渲染与边缘裁剪：思维导图全面升级 SVG 矢量直绘并施加裁剪边界，彻底解决了 Inkscape 隐藏图层溢出并污染连接线的 Bug。/ Upgraded high-DPI SVG rendering with painter clipping boundaries to prevent icon spillover.
+    * ✨ 特殊图层精准分流矩阵：完全剥离“在线图层”、“虚拟图层”、“内存与临时图层”与“无效图层”（挂载 Invalid_Layer.svg 图标）至独立分支展示。/ Decoupled online, virtual, memory, and invalid layers into dedicated branches with custom SVGs.
+    * ✨ 数据库容器树状拆解：针对 GPKG、GDB 及 ZIP 压缩包容器内部的图层，自动拆解出二级节点并挂载专属图标。/ Split ZIP, GPKG, and GDB databases into secondary tree nodes.
+    * ✨ 文件夹右键定位功能：支持在物理树和思维导图的文件夹节点上右键激活“打开文件夹位置”菜单（修复了 Windows 盘符相对路径导致跳转至我的文档的 Bug）。/ Added folder context menus to open location in Explorer (fixing Documents folder fallback).
+    * ✨ 超长目录路径智能省略与悬停：实现超长路径的 30 字符智能首尾省略算法，并支持鼠标悬停气泡（Tooltip）展现完整绝对路径。/ Introduced smart middle truncation for paths exceeding 30 characters with a hover tooltip.
+    Version 1.1.0:
+    * 🐛 修复双击图层缩放时引发的闪退问题。/ Resolved application crash during double-click layer zoom.
+    * 🎨 集成显示自定义插件图标以提升界面美化外观。/ Integrated custom plugin icon for improved GUI appearance.
+    Version 1.0.2:
+    * ✨ 增强界面交互与操作安全性：支持图层列表多选批量操作与表格交替背景色以提升可读性。/ Enhanced interface interaction and safety: enabled multi-selection and alternating row colors for list/tree views.
+    * ⚙️ 优化右键菜单对不同图层类型的支持以防止操作冲突。/ Optimized context menus for different layer types.
+    * ⚠️ 为文件重命名、物理移动和更改数据源等物理文件操作引入错误弹窗提示。/ Added warning dialogs for file operations like rename, move, and swap source.
+    * 🔒 实现工具栏视图切换的单选互斥效果。/ Improved toolbar view toggles to be mutually exclusive.
+    Version 1.0.1:
+    * 🚀 提升界面绘制性能与文件操作安全性：优化矩形树图在大数据量下的渲染流畅度与鼠标悬浮交互体验。/ Optimized rendering performance and file operation safety: improved treemap rendering fluency and hover experience.
+    * 📂 重构文件移动与重命名模块，支持大小写不敏感的文件检测与 QGIS 复杂图层源路径安全解析。/ Refactored file movements/renames to support case-insensitive matching and QGIS source parameters.
+    * 🔄 引入事务回滚与防重名覆盖机制以确保物理磁盘文件安全。/ Preventing accidental file overwrites and ensuring rollback safety.
+    Version 1.0.0:
+    * 🎉 首次发布：实现SuperLayer，支持图层按列表、文件夹树或矩形树图（以文件大小占比展示）进行可视化管理。/ Initial release: introduced SuperLayer with list, tree, and squarified treemap views.
+    * 📊 提供物理文件大小的实时计算与清理功能。/ Supporting real-time computation of physical file size.

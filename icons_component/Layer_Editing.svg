@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="32"
+   height="32"
+   viewBox="0 0 32 32"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   sodipodi:docname="0_TreeMap_component.svg"
+   xml:space="preserve"
+   inkscape:export-batch-name=""
+   inkscape:export-batch-path="..\icons_panel"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="true"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     inkscape:zoom="4.3144562"
+     inkscape:cx="379.53798"
+     inkscape:cy="23.52556"
+     inkscape:window-width="1920"
+     inkscape:window-height="1001"
+     inkscape:window-x="-9"
+     inkscape:window-y="41"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer11"><inkscape:page
+       x="0"
+       y="0"
+       width="32"
+       height="32"
+       id="page14"
+       margin="0"
+       bleed="0"
+       inkscape:label="Layer_Editing" /></sodipodi:namedview><defs
+     id="defs1" /><g
+     inkscape:groupmode="layer"
+     id="layer4"
+     inkscape:label="Layer_Editing"
+     transform="translate(-126)"><path
+       d="m 155.57861,6.2783228 -2.90089,2.8931263 -3.86933,-3.8579324 2.90179,-2.8930989 c 0.53401,-0.5326443 1.40018,-0.5326443 1.9342,0 l 1.93423,1.9291998 c 0.53402,0.5322044 0.53402,1.3960608 0,1.9287326 z m -20.31703,12.5358262 3.8689,3.858428 -5.15623,1.284144 1.28737,-5.142517 z m 16.4486,-8.678801 -11.60483,11.57234 -3.86796,-3.85697 11.60388,-11.5723678 z M 131.03088,6.9041933 V 26.96902 h 20.06527 V 11.920641 l 3.01007,-2.0064034 V 28.975864 c 0,0.758343 -0.24489,1.003201 -1.00367,1.003201 h -23.708 c -0.75833,0 -1.37368,-0.614438 -1.37368,-1.372782 V 4.8977903 c 0,-0.758317 0.24394,-1.0031739 1.00317,-1.0031739 h 19.06209 l -3.00958,3.0095769 h -14.04564 z m 0,0"
+       p-id="19169"
+       id="path1-2"
+       style="stroke-width:0.195312" /></g></svg>

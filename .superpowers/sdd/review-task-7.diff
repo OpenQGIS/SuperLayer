@@ -1,0 +1,218 @@
+# Review package for Task 7 (Python Diff)
+# Base Backup: C:\Users\tesla\AppData\Roaming\QGIS\QGIS3\profiles\ForTest\python\plugins\TreeMap_Layer_Manager\.superpowers\sdd\backups\task-7
+
+diff --git a/dock_widget.py b/dock_widget.py
+--- a\dock_widget.py
++++ b\dock_widget.py
+@@ -394,20 +394,34 @@
+             def zoom_to_fit(self): pass
+         def safe_copy(*args): pass
+         def safe_move(*args): pass
+         def safe_rename(*args): pass
+         def update_layer_source(*args): pass
+         def split_qgis_source(x): return x, ""
+         def get_associated_files(x): return [x] if x else []
+         def format_size(x): return "0 B"
+ 
+ 
++try:
++    from .layer_board_widget import LayerBoardWidget
++except ImportError:
++    try:
++        from layer_board_widget import LayerBoardWidget
++    except ImportError:
++        # Mock class for offline tests
++        class LayerBoardWidget(QWidget):
++            def __init__(self, iface=None, parent=None):
++                super().__init__(parent)
++            def populateLayerTable(self, t): pass
++            def populateAvailableEncodingList(self): pass
++
++
+ class TreeMapDockWidget(QDialog):
+     """The main QDialog container integrating flat list view, directory tree view,
+     treemap view, toolbar controls, and context menu actions."""
+ 
+     def __init__(self, iface, parent=None):
+         super().__init__(parent)
+         self.iface = iface
+         self.setWindowTitle("树状图层管理器")
+         
+         # Configure window properties
+@@ -454,25 +468,27 @@
+         self.physical_tree_view = QTreeView()
+         self.physical_tree_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
+         self.physical_tree_view.setAlternatingRowColors(True)
+         
+         self.group_tree_view = QTreeView()
+         self.group_tree_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
+         self.group_tree_view.setAlternatingRowColors(True)
+         
+         self.treemap_view = TreeMapWidget()
+         self.mindmap_view = MindMapView()
++        self.layer_board_view = LayerBoardWidget(self.iface) # NEW PAGE
+         
+         self.stacked_widget.addWidget(self.physical_tree_view)
+         self.stacked_widget.addWidget(self.group_tree_view)
+         self.stacked_widget.addWidget(self.treemap_view)
+         self.stacked_widget.addWidget(self.mindmap_view)
++        self.stacked_widget.addWidget(self.layer_board_view) # NEW PAGE
+         
+         # Models
+         self.physical_model = LayerTreeModel()
+         self.group_model = LayerTreeModel()
+         
+ 
+         self.physical_tree_view.setModel(self.physical_model)
+         self.group_tree_view.setModel(self.group_model)
+         
+         # Column widths are applied in refresh() after rebuild_model()
+@@ -560,20 +576,27 @@
+         self.act_treemap.triggered.connect(lambda: self.switch_view(2))
+         self.view_group.addAction(self.act_treemap)
+         self.toolbar.addAction(self.act_treemap)
+         
+         self.act_mindmap = QAction("思维导图", self)
+         self.act_mindmap.setCheckable(True)
+         self.act_mindmap.triggered.connect(lambda: self.switch_view(3))
+         self.view_group.addAction(self.act_mindmap)
+         self.toolbar.addAction(self.act_mindmap)
+         
++        # Add new Attribute Board Action
++        self.act_layer_board = QAction("属性看板", self)
++        self.act_layer_board.setCheckable(True)
++        self.act_layer_board.triggered.connect(lambda: self.switch_view(4))
++        self.view_group.addAction(self.act_layer_board)
++        self.toolbar.addAction(self.act_layer_board)
++        
+         self.toolbar.addSeparator()
+         
+         self.act_refresh = QAction("刷新", self)
+         self.act_refresh.triggered.connect(self.refresh)
+         self.toolbar.addAction(self.act_refresh)
+ 
+     def _setup_connections(self):
+         # Right click menu context
+         self.physical_tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
+         self.physical_tree_view.customContextMenuRequested.connect(self.show_physical_tree_context_menu)
+@@ -687,20 +710,21 @@
+         for key, btn in self.filter_buttons.items():
+             self.set_tag_button_active(btn, key == active_key)
+             
+         self.refresh()
+ 
+     def switch_view(self, index):
+         self.act_physical_tree.setChecked(index == 0)
+         self.act_group_tree.setChecked(index == 1)
+         self.act_treemap.setChecked(index == 2)
+         self.act_mindmap.setChecked(index == 3)
++        self.act_layer_board.setChecked(index == 4) # NEW
+         self.stacked_widget.setCurrentIndex(index)
+         
+         filter_str = self.current_filter_format.lower() if self.current_filter_format else None
+         project = QgsProject.instance()
+         layers = []
+         if project:
+             all_layers = list(project.mapLayers().values())
+             if filter_str:
+                 try:
+                     from .layer_model import get_layer_format
+@@ -711,20 +735,25 @@
+                         if source.endswith('.tif'): return 'tif'
+                         return 'other'
+                 layers = [l for l in all_layers if get_layer_format(l) == filter_str]
+             else:
+                 layers = all_layers
+                 
+         if index == 2:
+             self.treemap_view.set_layers(layers)
+         elif index == 3:
+             self.mindmap_view.set_layers(layers)
++        elif index == 4:
++            # Refresh Attribute Board when switched to
++            self.layer_board_view.populateLayerTable('vector')
++            self.layer_board_view.populateLayerTable('raster')
++            self.layer_board_view.populateAvailableEncodingList()
+ 
+     def _apply_column_widths(self):
+         """Apply fixed column widths after model rebuild."""
+         for view in (self.physical_tree_view, self.group_tree_view):
+             view.setColumnWidth(0, 300)
+             view.setColumnWidth(1, 80)
+             view.setColumnWidth(2, 250)
+             hdr = view.header()
+             if hdr and hdr.count() > 2:
+                 hdr.setSectionResizeMode(0, QHeaderView.Interactive)
+@@ -764,20 +793,24 @@
+                             if source.endswith('.tif'): return 'tif'
+                             return 'other'
+                     layers = [l for l in all_layers if get_layer_format(l) == filter_str]
+                 else:
+                     layers = all_layers
+             
+             if self.stacked_widget.currentIndex() == 2:
+                 self.treemap_view.set_layers(layers)
+             elif self.stacked_widget.currentIndex() == 3:
+                 self.mindmap_view.set_layers(layers)
++            elif self.stacked_widget.currentIndex() == 4:
++                self.layer_board_view.populateLayerTable('vector')
++                self.layer_board_view.populateLayerTable('raster')
++                self.layer_board_view.populateAvailableEncodingList()
+         finally:
+             self._is_refreshing = False
+ 
+     def on_item_double_clicked(self, index):
+         if index.column() > 0:
+             index = index.sibling(index.row(), 0)
+         
+         model = self.physical_model
+         if hasattr(index, 'model') and index.model():
+             model = index.model()
+
+diff --git a/test_dock_widget.py b/test_dock_widget.py
+--- a\test_dock_widget.py
++++ b\test_dock_widget.py
+@@ -548,12 +548,42 @@
+                 mock_menu.addAction.return_value = mock_action
+                 
+                 def mock_triggered_connect(callback):
+                     callback()
+                 mock_action.triggered.connect = mock_triggered_connect
+                 
+                 with patch('os.path.isdir', return_value=True):
+                     dock._create_folder_context_menu("/some/physical/dir", MagicMock())
+                     mock_popen.assert_called_with('explorer.exe "\\some\\physical\\dir"')
+ 
++    def test_switch_view_layer_board(self):
++        with patch('dock_widget.LayerTreeModel'), \
++             patch('dock_widget.TreeMapWidget'), \
++             patch('dock_widget.MindMapView'), \
++             patch('dock_widget.LayerBoardWidget') as mock_lb_cls:
++            
++            mock_lb = MagicMock()
++            mock_lb_cls.return_value = mock_lb
++            
++            dock = TreeMapDockWidget(self.iface, self.parent)
++            
++            # Reset mock to clear calls during initialization/refresh inside init
++            mock_lb.reset_mock()
++            
++            # Switch to Attribute Board (index 4)
++            dock.switch_view(4)
++            self.assertTrue(dock.act_layer_board.isChecked())
++            self.assertEqual(dock.stacked_widget.currentIndex(), 4)
++            mock_lb.populateLayerTable.assert_any_call('vector')
++            mock_lb.populateLayerTable.assert_any_call('raster')
++            mock_lb.populateAvailableEncodingList.assert_called_once()
++            
++            # Reset mock and test running refresh when active
++            mock_lb.reset_mock()
++            dock.refresh()
++            mock_lb.populateLayerTable.assert_any_call('vector')
++            mock_lb.populateLayerTable.assert_any_call('raster')
++            mock_lb.populateAvailableEncodingList.assert_called_once()
++
++
+ if __name__ == '__main__':
+     unittest.main()
+

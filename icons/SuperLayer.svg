@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   t="1784349433034"
+   class="icon"
+   viewBox="0 0 1024 1024"
+   version="1.1"
+   p-id="5363"
+   width="200"
+   height="200"
+   id="svg12"
+   sodipodi:docname="TreeMap_Layer_Manager.svg"
+   inkscape:export-filename="TreeMap_Layer_Manager.png"
+   inkscape:export-xdpi="150"
+   inkscape:export-ydpi="150"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs12" />
+  <sodipodi:namedview
+     id="namedview12"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.2440625"
+     inkscape:cx="215.10883"
+     inkscape:cy="342.12548"
+     inkscape:window-width="1920"
+     inkscape:window-height="1001"
+     inkscape:window-x="-9"
+     inkscape:window-y="41"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg12" />
+  <path
+     d="M440 417.76v-37.333333H192V218.666667h-37.333333v650.666666h285.333333v-37.333333H192v-188.426667h248v-37.333333H192V417.76h248z"
+     fill="#0985F6"
+     p-id="5364"
+     id="path1" />
+  <path
+     d="M184 226.666667v161.76H432v21.333333H184v204.48H432v21.333333H184v204.426667H432v21.333333H162.666667v-634.666666h21.333333M192 218.666667h-37.333333v650.666666h285.333333v-37.333333H192v-188.426667h248v-37.333333H192V417.76h248v-37.333333H192V218.666667z"
+     fill="#006FC1"
+     p-id="5365"
+     id="path2" />
+  <path
+     d="M106.666667 106.666667h133.333333v133.333333H106.666667z"
+     fill="#0985F6"
+     p-id="5366"
+     id="path3" />
+  <path
+     d="M229.333333 117.333333v112H117.333333V117.333333h112m10.666667-10.666666H106.666667v133.333333h133.333333V106.666667z"
+     fill="#006FC1"
+     p-id="5367"
+     id="path4" />
+  <path
+     d="M277.333333 106.666667h640v133.333333H277.333333z"
+     fill="#0985F6"
+     p-id="5368"
+     id="path5" />
+  <path
+     d="M906.666667 117.333333v112H288V117.333333h618.666667m10.666666-10.666666H277.333333v133.333333h640V106.666667z"
+     fill="#006FC1"
+     p-id="5369"
+     id="path6" />
+  <path
+     d="M402.88 332.426667H917.333333v133.333333H402.88z"
+     fill="#0985F6"
+     p-id="5370"
+     id="path7" />
+  <path
+     d="M906.666667 343.093333v112H413.546667v-112H906.666667m10.666666-10.666666H402.88v133.333333H917.333333v-133.333333z"
+     fill="#006FC1"
+     p-id="5371"
+     id="path8" />
+  <path
+     d="M402.88 558.24H917.333333v133.333333H402.88z"
+     fill="#23B8BA"
+     p-id="5372"
+     id="path9" />
+  <path
+     d="M906.666667 568.906667v112H413.546667v-112H906.666667m10.666666-10.666667H402.88v133.333333H917.333333v-133.333333z"
+     fill="#14A59E"
+     p-id="5373"
+     id="path10" />
+  <path
+     d="M402.88 784H917.333333v133.333333H402.88z"
+     fill="#FFA800"
+     p-id="5374"
+     id="path11" />
+  <path
+     d="M906.666667 794.666667v112H413.546667v-112H906.666667m10.666666-10.666667H402.88v133.333333H917.333333v-133.333333z"
+     fill="#E29103"
+     p-id="5375"
+     id="path12" />
+</svg>

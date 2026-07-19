@@ -1,0 +1,3 @@
+Task 3 Files Modified:
+- test_dock_widget.py
+- test_main_plugin.py
