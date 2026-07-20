@@ -8,10 +8,15 @@
 
 1.  **多视角视图切换**
     *   **物理树视图**：直接将磁盘上的物理文件关系映射为树状结构，展示各个文件夹及下属图层的存储层次。
+        ![物理树与列表视图](screenshots/1-Document.png)
     *   **组树视图**：完整映射 QGIS 图层面板的图层组逻辑结构。
+        ![图层组树视图](screenshots/2-Layer.png)
     *   **矩形树图**：按图层文件在磁盘上的实际占用空间生成大小比例矩形，大图层和无效冗余数据一目了然。
+        ![矩形树图](screenshots/3-Treemap.png)
     *   **思维导图**：自动将目录与图层生成高清矢量思维脑图，并将在线图层、临时内存图层及失效无效图层精准分流展示。
+        ![路径思维导图](screenshots/4-Path-mindmap.png)
     *   **属性看板**：提供全功能的表格格网，用以批量且就地编辑图层基本元数据，带有就地校验和脏数据高亮提示。
+        ![属性看板](screenshots/5-Batch.png)
 2.  **物理存储层级的安全重构**
     *   **安全移动与重命名**：提供在操作系统文件层面移动、重命名及复制矢量/栅格图层的功能。移动时会自动携带所有伴生文件（如 `.shp` 伴生的 `.shx`、`.dbf`、`.prj` 等），并在完成后自动更新 QGIS 中的图层数据源路径，防止数据源丢失或损坏。
     *   **磁盘文件物理追踪**：图层和文件夹均支持右键“打开文件夹位置”，一键唤起文件资源管理器并定位。
@@ -61,10 +66,15 @@
 
 1.  **Multiple Visual Perspectives**
     *   **Physical Tree**: Displays layers in hierarchical directories on disk, allowing direct relocations.
+        ![Physical Tree & List](screenshots/1-Document.png)
     *   **Group Tree**: Matches the logical group structure of the native QGIS Layers Panel.
+        ![Group Tree](screenshots/2-Layer.png)
     *   **Treemap**: Renders responsive proportional rectangles by file size to spot massive or obsolete files easily.
+        ![TreeMap](screenshots/3-Treemap.png)
     *   **Mindmap**: Compiles hierarchical directories into vector SVG mindmaps, filtering invalid, temporary, and online layers cleanly.
+        ![MindMap](screenshots/4-Path-mindmap.png)
     *   **Layer Board**: Features a spreadsheets-like grid for batch properties tuning with live validation and rollback capabilities.
+        ![Layer Board](screenshots/5-Batch.png)
 2.  **Safe Directory Restructuring**
     *   **Physical Move & Rename**: Moves, copies, or renames vector and raster files on disk. Handles all sidecar files (e.g. `.shp` auxiliary files `.shx`, `.dbf`, `.prj`) and auto-updates layer data sources inside QGIS.
     *   **Open Directory**: Right-click menus on folder and layer nodes to reveal files in Windows Explorer / OS Finder.

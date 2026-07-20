@@ -300,10 +300,10 @@ class MindMapNodeItem(QGraphicsObject):
             self.svg_path = os.path.join(plugin_dir, "icons_panel", "VirtualLayer.svg")
         elif node.name == "无效图层":
             plugin_dir = os.path.dirname(os.path.abspath(__file__))
-            self.svg_path = os.path.join(plugin_dir, "icons_panel", "Invalid_Layer.svg")
+            self.svg_path = os.path.join(plugin_dir, "icons_panel", "Document_Invalid.svg")
         elif node.name == "在线图层":
             plugin_dir = os.path.dirname(os.path.abspath(__file__))
-            self.svg_path = os.path.join(plugin_dir, "icons_panel", "XYZ_Layer.svg")
+            self.svg_path = os.path.join(plugin_dir, "icons_panel", "document_online.svg")
         else:
             self.svg_path = _get_folder_icon_path(is_physical=node.is_physical_folder, path=node.path)
             
@@ -774,20 +774,22 @@ class MindMapView(QGraphicsView):
                 except Exception:
                     pass
             
+            if is_online:
+                continue
+            
             # Check if it is a virtual layer
             is_virtual = False
-            if not is_online:
-                try:
-                    if hasattr(layer, 'dataProvider') and layer.dataProvider():
-                        prov_name = layer.dataProvider().name().lower()
-                        if prov_name == 'virtual':
-                            is_virtual = True
-                except Exception:
-                    pass
+            try:
+                if hasattr(layer, 'dataProvider') and layer.dataProvider():
+                    prov_name = layer.dataProvider().name().lower()
+                    if prov_name == 'virtual':
+                        is_virtual = True
+            except Exception:
+                pass
             
             # Check if it is a memory or temporary layer
             is_memory = False
-            if not is_online and not is_virtual:
+            if not is_virtual:
                 if not phys_path:
                     is_memory = True
                 else:
@@ -799,10 +801,7 @@ class MindMapView(QGraphicsView):
                     except Exception:
                         pass
                     
-            if is_online:
-                # Put online layers under an Online folder
-                self._insert_layer_to_tree(root, ["在线图层"], layer, "")
-            elif is_virtual:
+            if is_virtual:
                 # Put virtual layers under a Virtual folder
                 self._insert_layer_to_tree(root, ["虚拟图层"], layer, "")
             elif is_memory:

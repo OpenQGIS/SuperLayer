@@ -9,7 +9,7 @@ try:
     from PyQt5.QtCore import Qt, QCoreApplication, QSettings, QTranslator, QSize
     from PyQt5.QtGui import QIcon, QTextCursor, QBrush, QColor
     from PyQt5.QtWidgets import (
-        QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QTabWidget, QTableWidget,
+        QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
         QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
         QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView
     )
@@ -18,7 +18,7 @@ except ImportError:
         from qtpy.QtCore import Qt, QCoreApplication, QSettings, QTranslator, QSize
         from qtpy.QtGui import QIcon, QTextCursor, QBrush, QColor
         from qtpy.QtWidgets import (
-            QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QTabWidget, QTableWidget,
+            QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
             QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
             QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView
         )
@@ -27,7 +27,7 @@ except ImportError:
             from PySide2.QtCore import Qt, QCoreApplication, QSettings, QTranslator, QSize
             from PySide2.QtGui import QIcon, QTextCursor, QBrush, QColor
             from PySide2.QtWidgets import (
-                QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QTabWidget, QTableWidget,
+                QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
                 QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
                 QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView
             )
@@ -36,7 +36,7 @@ except ImportError:
                 from PySide6.QtCore import Qt, QCoreApplication, QSize
                 from PySide6.QtGui import QAction, QIcon, QTextCursor, QBrush, QColor
                 from PySide6.QtWidgets import (
-                    QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QTabWidget, QTableWidget,
+                    QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
                     QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
                     QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView
                 )
@@ -72,6 +72,12 @@ except ImportError:
                             self._color_val = args
                     def name(self):
                         return str(self._color_val)
+                class QSizePolicy:
+                    Expanding = 7
+                    Preferred = 4
+                    Fixed = 0
+                    Minimum = 1
+                    Ignored = 13
                 class QWidget:
                     def __init__(self, parent=None):
                         self.layout = None
@@ -80,7 +86,14 @@ except ImportError:
                         self.layout = layout
                     def setStyleSheet(self, style): pass
                     def setMinimumHeight(self, h): pass
+                    def setMinimumWidth(self, w): pass
                     def setMaximumWidth(self, w): pass
+                    def setFixedWidth(self, w): pass
+                    def setFixedHeight(self, h): pass
+                    def setFixedSize(self, w, h): pass
+                    def setObjectName(self, name): pass
+                    def setSizePolicy(self, *args): pass
+                    def wheelEvent(self, event): pass
                     def setEnabled(self, e):
                         self._enabled = e
                     def isEnabled(self):
@@ -95,6 +108,11 @@ except ImportError:
                     def setSpacing(self, s): pass
                     def addStretch(self, *args): pass
                 class QHBoxLayout(QVBoxLayout): pass
+                class QGridLayout(QVBoxLayout):
+                    def setHorizontalSpacing(self, s): pass
+                    def setVerticalSpacing(self, s): pass
+                    def setColumnStretch(self, col, stretch): pass
+                    def addWidget(self, widget, row, col, *args): pass
                 class QSplitter(QWidget):
                     def __init__(self, *args):
                         super().__init__()
@@ -150,6 +168,12 @@ except ImportError:
                     def setAlternatingRowColors(self, val): pass
                     def setSelectionBehavior(self, behavior): pass
                     def setSelectionMode(self, mode): pass
+                    def horizontalScrollBar(self): return None
+                    def setHorizontalScrollMode(self, mode): pass
+                    def verticalHeader(self):
+                        class MockHeader:
+                            def setDefaultSectionSize(self, size): pass
+                        return MockHeader()
                     def selectionModel(self):
                         class MockSM:
                             def __init__(self, table):
@@ -186,6 +210,9 @@ except ImportError:
                         super().__init__()
                         self.text = text
                         self.clicked = _Signal()
+                    def setIcon(self, icon): pass
+                    def setIconSize(self, size): pass
+                    def setToolTip(self, text): pass
                 class QLineEdit(QWidget):
                     def __init__(self, parent=None):
                         super().__init__()
@@ -240,6 +267,8 @@ except ImportError:
                 class QAbstractItemView:
                     SelectRows = 1
                     ExtendedSelection = 3
+                    ScrollPerItem = 0
+                    ScrollPerPixel = 1
                 class QCoreApplication:
                     @staticmethod
                     def translate(context, message):
@@ -336,6 +365,23 @@ except ImportError:
     class QgsLayerTreeUtils:
         @classmethod
         def countMapLayerInTree(cls, root, layer): return 1
+class CustomTableWidget(QTableWidget):
+    """Custom QTableWidget that handles Alt + Mouse Wheel to scroll horizontally with a smaller step size."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+
+    def wheelEvent(self, event):
+        if event.modifiers() & Qt.AltModifier:
+            delta = event.angleDelta().y() if event.angleDelta().y() != 0 else event.angleDelta().x()
+            hbar = self.horizontalScrollBar()
+            if hbar:
+                # Custom smaller horizontal scrolling step (30 pixels per notch)
+                scroll_amount = int(30 * (delta / 120.0))
+                hbar.setValue(hbar.value() - scroll_amount)
+            event.accept()
+        else:
+            super().wheelEvent(event)
 
 
 class LayerBoardWidget(QWidget):
@@ -384,6 +430,7 @@ class LayerBoardWidget(QWidget):
         self.layersAttributes = {}
         self.layerBoardChangedData = {'vector': {}, 'raster': {}}
         self.layerBoardData = {'vector': [], 'raster': []}
+        self._last_active_layer_type = 'vector'
         
         self.csvDelimiter = ','
         self.csvQuotechar = '"'
@@ -398,6 +445,7 @@ class LayerBoardWidget(QWidget):
         return QCoreApplication.translate('LayerBoardWidget', message)
         
     def init_ui(self):
+        self.setObjectName("LayerBoardWidget")
         # 1. Main Layout
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(10, 10, 10, 10)
@@ -409,20 +457,22 @@ class LayerBoardWidget(QWidget):
         
         # 3. Left Panel (Tab widget for vector and raster tables)
         self.left_container = QWidget()
+        self.left_container.setObjectName("left_container")
         left_layout = QVBoxLayout(self.left_container)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(10)
         
         self.tab_widget = QTabWidget()
+        self.tab_widget.setObjectName("tab_widget")
         left_layout.addWidget(self.tab_widget)
         
         # Vector Tab
         self.vector_tab = QWidget()
         vector_layout = QVBoxLayout(self.vector_tab)
-        vector_layout.setContentsMargins(0, 0, 0, 0)
+        vector_layout.setContentsMargins(8, 8, 8, 8)
         vector_layout.setSpacing(6)
         
-        self.vector_table = QTableWidget()
+        self.vector_table = CustomTableWidget()
         self.vector_table.setAlternatingRowColors(True)
         self.vector_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.vector_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -442,10 +492,10 @@ class LayerBoardWidget(QWidget):
         # Raster Tab
         self.raster_tab = QWidget()
         raster_layout = QVBoxLayout(self.raster_tab)
-        raster_layout.setContentsMargins(0, 0, 0, 0)
+        raster_layout.setContentsMargins(8, 8, 8, 8)
         raster_layout.setSpacing(6)
         
-        self.raster_table = QTableWidget()
+        self.raster_table = CustomTableWidget()
         self.raster_table.setAlternatingRowColors(True)
         self.raster_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.raster_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -475,9 +525,10 @@ class LayerBoardWidget(QWidget):
         
         # 4. Right Panel (Direct widget, not wrapped in QScrollArea to prevent child QTabWidget collapsing)
         self.right_container = QWidget()
+        self.right_container.setObjectName("right_container")
         self.right_container.setMaximumWidth(360)
         self.right_layout = QVBoxLayout(self.right_container)
-        self.right_layout.setContentsMargins(10, 10, 10, 10)
+        self.right_layout.setContentsMargins(10, 0, 0, 0)
         self.right_layout.setSpacing(12)
         
         # Initialize sections (stubs for task 1)
@@ -494,93 +545,96 @@ class LayerBoardWidget(QWidget):
     def _init_right_panel_stubs(self):
         # Create QTabWidget for right panel controls
         self.right_tab_widget = QTabWidget()
+        self.right_tab_widget.setObjectName("right_tab_widget")
         self.right_layout.addWidget(self.right_tab_widget)
         
         # --- TAB 1: Actions on Layers (图层操作) ---
         tab_actions = QWidget()
         actions_layout = QVBoxLayout(tab_actions)
         actions_layout.setContentsMargins(8, 8, 8, 8)
-        actions_layout.setSpacing(10)
+        actions_layout.setSpacing(8)
         
         # Batch updates (inside group box)
         group_batch = QGroupBox(self.tr("批量更新 (Batch Update)"))
         batch_layout = QVBoxLayout(group_batch)
-        batch_layout.setSpacing(8)
-        
-        # Row 1: CRS and Encoding side-by-side
-        row1_layout = QHBoxLayout()
-        row1_layout.setSpacing(12)
-        
-        # CRS Left Column
-        crs_widget = QWidget()
-        crs_v_layout = QVBoxLayout(crs_widget)
-        crs_v_layout.setContentsMargins(0, 0, 0, 0)
-        crs_v_layout.setSpacing(4)
+        batch_layout.setContentsMargins(4, 4, 4, 4)
+        grid_layout = QGridLayout()
+        grid_layout.setHorizontalSpacing(6)
+        grid_layout.setVerticalSpacing(6)
+        grid_layout.setColumnStretch(0, 1)   # CRS / MaxScale column
+        grid_layout.setColumnStretch(1, 1)   # Encoding / MinScale column
+
+        # Row 0: Labels (plain, no embedded buttons)
+        plugin_dir = os.path.dirname(os.path.abspath(__file__))
         crs_lbl = QLabel(self.tr("设置 CRS:"))
-        crs_v_layout.addWidget(crs_lbl)
-        crs_row = QHBoxLayout()
-        self.inCrs = QLineEdit()
-        self.btDefineProjection = QPushButton("...")
-        self.btApplyCrs = QPushButton(self.tr("应用"))
-        crs_row.addWidget(self.inCrs, 1)
-        crs_row.addWidget(self.btDefineProjection)
-        crs_row.addWidget(self.btApplyCrs)
-        crs_v_layout.addLayout(crs_row)
-        row1_layout.addWidget(crs_widget, 1)
-        
-        # Encoding Right Column
-        enc_widget = QWidget()
-        enc_v_layout = QVBoxLayout(enc_widget)
-        enc_v_layout.setContentsMargins(0, 0, 0, 0)
-        enc_v_layout.setSpacing(4)
         self.encodingLabel = QLabel(self.tr("设置编码 (仅矢量):"))
-        enc_v_layout.addWidget(self.encodingLabel)
-        enc_row = QHBoxLayout()
+        grid_layout.addWidget(crs_lbl, 0, 0)
+        grid_layout.addWidget(self.encodingLabel, 0, 1)
+
+        # Row 1: [inCrs + CRS icon btn] as one unit | Encoding dropdown
+        crs_icon_path = os.path.join(plugin_dir, "icons_panel", "CRS.svg")
+        crs_icon = QIcon(crs_icon_path) if os.path.exists(crs_icon_path) else QIcon()
+
+        crs_input_widget = QWidget()
+        crs_input_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        crs_input_widget.setMinimumWidth(0)
+        crs_input_layout = QHBoxLayout(crs_input_widget)
+        crs_input_layout.setContentsMargins(0, 0, 0, 0)
+        crs_input_layout.setSpacing(2)
+        self.inCrs = QLineEdit()
+        self.inCrs.setFixedHeight(24)
+        self.btDefineProjection = QPushButton()
+        self.btDefineProjection.setObjectName("btDefineProjection")
+        self.btDefineProjection.setIcon(crs_icon)
+        self.btDefineProjection.setIconSize(QSize(16, 16))
+        self.btDefineProjection.setFixedSize(24, 24)
+        self.btDefineProjection.setToolTip(self.tr("选择坐标系"))
+        crs_input_layout.addWidget(self.inCrs, 1)
+        crs_input_layout.addWidget(self.btDefineProjection)
+
         self.inEncodingList = QComboBox()
+        self.inEncodingList.setMinimumWidth(0)
+        self.inEncodingList.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.populateAvailableEncodingList()
-        self.btApplyEncoding = QPushButton(self.tr("应用"))
-        enc_row.addWidget(self.inEncodingList, 1)
-        enc_row.addWidget(self.btApplyEncoding)
-        enc_v_layout.addLayout(enc_row)
-        row1_layout.addWidget(enc_widget, 1)
-        
-        batch_layout.addLayout(row1_layout)
-        
-        # Row 2: Max Scale and Min Scale side-by-side
-        row2_layout = QHBoxLayout()
-        row2_layout.setSpacing(12)
-        
-        # Max Scale Left Column
-        max_scale_widget = QWidget()
-        max_scale_v_layout = QVBoxLayout(max_scale_widget)
-        max_scale_v_layout.setContentsMargins(0, 0, 0, 0)
-        max_scale_v_layout.setSpacing(4)
+        enc_wrapper = QWidget()
+        enc_wrapper.setMinimumWidth(0)
+        enc_wrapper.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        enc_wrap_layout = QHBoxLayout(enc_wrapper)
+        enc_wrap_layout.setContentsMargins(0, 0, 0, 0)
+        enc_wrap_layout.addWidget(self.inEncodingList)
+        grid_layout.addWidget(crs_input_widget, 1, 0)
+        grid_layout.addWidget(enc_wrapper, 1, 1)
+
+        # Row 2: Labels
         max_scale_lbl = QLabel(self.tr("设置最大比例尺:"))
-        max_scale_v_layout.addWidget(max_scale_lbl)
-        max_row = QHBoxLayout()
-        self.inMaxScale = QLineEdit()
-        self.btApplyMaxScale = QPushButton(self.tr("应用"))
-        max_row.addWidget(self.inMaxScale, 1)
-        max_row.addWidget(self.btApplyMaxScale)
-        max_scale_v_layout.addLayout(max_row)
-        row2_layout.addWidget(max_scale_widget, 1)
-        
-        # Min Scale Right Column
-        min_scale_widget = QWidget()
-        min_scale_v_layout = QVBoxLayout(min_scale_widget)
-        min_scale_v_layout.setContentsMargins(0, 0, 0, 0)
-        min_scale_v_layout.setSpacing(4)
         min_scale_lbl = QLabel(self.tr("设置最小比例尺:"))
-        min_scale_v_layout.addWidget(min_scale_lbl)
-        min_row = QHBoxLayout()
+        grid_layout.addWidget(max_scale_lbl, 2, 0)
+        grid_layout.addWidget(min_scale_lbl, 2, 1)
+
+        # Row 3: Max Scale | Min Scale inputs  (equal full-column width)
+        self.inMaxScale = QLineEdit()
+        max_scale_wrapper = QWidget()
+        max_scale_wrapper.setMinimumWidth(0)
+        max_scale_wrapper.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        max_scale_wrap_layout = QHBoxLayout(max_scale_wrapper)
+        max_scale_wrap_layout.setContentsMargins(0, 0, 0, 0)
+        max_scale_wrap_layout.addWidget(self.inMaxScale)
         self.inMinScale = QLineEdit()
-        self.btApplyMinScale = QPushButton(self.tr("应用"))
-        min_row.addWidget(self.inMinScale, 1)
-        min_row.addWidget(self.btApplyMinScale)
-        min_scale_v_layout.addLayout(min_row)
-        row2_layout.addWidget(min_scale_widget, 1)
-        
-        batch_layout.addLayout(row2_layout)
+        min_scale_wrapper = QWidget()
+        min_scale_wrapper.setMinimumWidth(0)
+        min_scale_wrapper.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        min_scale_wrap_layout = QHBoxLayout(min_scale_wrapper)
+        min_scale_wrap_layout.setContentsMargins(0, 0, 0, 0)
+        min_scale_wrap_layout.addWidget(self.inMinScale)
+        grid_layout.addWidget(max_scale_wrapper, 3, 0)
+        grid_layout.addWidget(min_scale_wrapper, 3, 1)
+
+        batch_layout.addLayout(grid_layout)
+
+        # Unified apply button
+        self.btApplyBatchUpdate = QPushButton(self.tr("应用"))
+        self.btApplyBatchUpdate.setObjectName("btApplyBatchUpdate")
+        batch_layout.addWidget(self.btApplyBatchUpdate)
         actions_layout.addWidget(group_batch)
         
         # 2. Actions Group Box
@@ -619,7 +673,7 @@ class LayerBoardWidget(QWidget):
         
         self.styleScrollArea = QScrollArea()
         self.styleScrollArea.setWidgetResizable(True)
-        self.styleScrollArea.setMinimumHeight(150)
+        self.styleScrollArea.setMinimumHeight(90)
         self.btApplyStyle = QPushButton(self.tr("应用样式"))
         style_layout.addWidget(self.styleScrollArea, 1)
         style_layout.addWidget(self.btApplyStyle)
@@ -654,7 +708,7 @@ class LayerBoardWidget(QWidget):
         log_layout.addWidget(self.txtLog, 1)
         log_layout.addWidget(self.btClearLog)
         
-        self.right_tab_widget.addTab(tab_log, self.tr("操作日志"))
+        self.tab_widget.addTab(tab_log, self.tr("操作日志"))
         
         self._setup_connections()
 
@@ -669,11 +723,8 @@ class LayerBoardWidget(QWidget):
         self.btApplyStyle.clicked.connect(self.applyStyle)
         self.btExportCsv.clicked.connect(self.exportToCsv)
         
-        # Bulk updates
-        self.btApplyCrs.clicked.connect(lambda: self.applyPropertyOnSelectedLayers('crs'))
-        self.btApplyMaxScale.clicked.connect(lambda: self.applyPropertyOnSelectedLayers('maxScale'))
-        self.btApplyMinScale.clicked.connect(lambda: self.applyPropertyOnSelectedLayers('minScale'))
-        self.btApplyEncoding.clicked.connect(lambda: self.applyPropertyOnSelectedLayers('encoding'))
+        # Bulk updates — single unified apply button
+        self.btApplyBatchUpdate.clicked.connect(self.applyBatchUpdate)
         
         # Batch actions
         self.btSaveStyleAsDefault.clicked.connect(lambda: self.performActionOnSelectedLayers('saveStyleAsDefault'))
@@ -693,6 +744,26 @@ class LayerBoardWidget(QWidget):
                 font-size: 12px;
                 font-weight: 500;
             }
+            QPushButton#btApplyBatchUpdate {
+                background-color: #4a90d9;
+                color: #ffffff;
+                border: none;
+                font-weight: 600;
+            }
+            QPushButton#btApplyBatchUpdate:hover {
+                background-color: #357abd;
+            }
+            QPushButton#btApplyBatchUpdate:pressed {
+                background-color: #2868a8;
+            }
+            QPushButton#btDefineProjection {
+                padding: 2px;
+                background-color: #f1f3f5;
+                border: 1px solid #ced4da;
+            }
+            QPushButton#btDefineProjection:hover {
+                background-color: #e9ecef;
+            }
             QPushButton:hover {
                 background-color: #e9ecef;
                 color: #212529;
@@ -708,9 +779,14 @@ class LayerBoardWidget(QWidget):
                 gridline-color: #dee2e6;
                 border: 1px solid #dee2e6;
                 font-size: 12px;
+                selection-background-color: #1484dc;
+                selection-color: #ffffff;
             }
             QTableWidget::item {
                 padding: 5px;
+            }
+            QWidget#right_container QTreeView::item, QWidget#right_container QTableView::item {
+                height: 20px;
             }
             QGroupBox {
                 font-weight: bold;
@@ -756,7 +832,17 @@ class LayerBoardWidget(QWidget):
         table.setHorizontalHeaderLabels(columnsLabels)
         
         lr = QgsProject.instance()
+        try:
+            from .layer_model import get_layer_format
+        except ImportError:
+            try:
+                from layer_model import get_layer_format
+            except ImportError:
+                def get_layer_format(l):
+                    return "其他"
         for lid, layer in lr.mapLayers().items():
+            if get_layer_format(layer) == "在线图层":
+                continue
             if layerType == 'vector' and layer.type() != QgsMapLayer.VectorLayer:
                 continue
             if layerType == 'raster' and layer.type() != QgsMapLayer.RasterLayer:
@@ -774,12 +860,25 @@ class LayerBoardWidget(QWidget):
                 newItem.setToolTip(layer.name())
                 
                 # Check spatial only for non-spatial layers
-                if layerType == 'vector' and not layer.isSpatial() and attr.get('spatial_only'):
-                    newItem.setFlags(Qt.NoItemFlags)
-                elif attr.get('editable'):
+                is_editable = attr.get('editable', False)
+                is_spatial_disabled = (layerType == 'vector' and not layer.isSpatial() and attr.get('spatial_only'))
+                
+                if is_spatial_disabled:
+                    newItem.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                    try:
+                        from PyQt5.QtGui import QBrush, QColor
+                        newItem.setForeground(QBrush(QColor('#8c96a0')))
+                    except ImportError:
+                        pass
+                elif is_editable:
                     newItem.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled)
                 else:
-                    newItem.setFlags(Qt.ItemIsSelectable)
+                    newItem.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                    try:
+                        from PyQt5.QtGui import QBrush, QColor
+                        newItem.setForeground(QBrush(QColor('#8c96a0')))
+                    except ImportError:
+                        pass
                     
                 if layerType == 'vector' and not layer.isSpatial() and attr.get('spatial_only'):
                     value = None
@@ -1078,7 +1177,13 @@ class LayerBoardWidget(QWidget):
         if hasattr(self.iface, 'mapCanvas'): self.iface.mapCanvas().refresh()
 
     def getActiveLayerType(self):
-        return 'vector' if self.tab_widget.currentIndex() == 0 else 'raster'
+        idx = self.tab_widget.currentIndex()
+        if idx == 0:
+            return 'vector'
+        elif idx == 1:
+            return 'raster'
+        else:
+            return getattr(self, '_last_active_layer_type', 'vector')
 
     def chooseProjection(self):
         try:
@@ -1109,6 +1214,11 @@ class LayerBoardWidget(QWidget):
                 self.inCrs.setText(crs.authid())
         except Exception:
             pass
+
+    def applyBatchUpdate(self):
+        """Apply all non-empty batch update fields to selected layers."""
+        for key in ('crs', 'encoding', 'maxScale', 'minScale'):
+            self.applyPropertyOnSelectedLayers(key)
 
     def applyPropertyOnSelectedLayers(self, key):
         layerType = self.getActiveLayerType()
@@ -1181,11 +1291,16 @@ class LayerBoardWidget(QWidget):
         self.populateLayerTable('raster')
 
     def onTabChanged(self):
+        idx = self.tab_widget.currentIndex()
+        if idx == 0:
+            self._last_active_layer_type = 'vector'
+        elif idx == 1:
+            self._last_active_layer_type = 'raster'
+            
         layerType = self.getActiveLayerType()
         isEnabled = layerType == 'vector'
         self.encodingLabel.setEnabled(isEnabled)
         self.inEncodingList.setEnabled(isEnabled)
-        self.btApplyEncoding.setEnabled(isEnabled)
         self.btCreateSpatialIndex.setEnabled(isEnabled)
 
     def setSelectedLayerStyleWidget(self, layerType, selected=None, unselected=None):
@@ -1233,19 +1348,52 @@ class LayerBoardWidget(QWidget):
         else:
             self.inEncodingList.setCurrentIndex(0)
             
-        # Dynamic style Dialog loading (only Vector layers supported by QGIS UI)
-        if layer.type() == QgsMapLayer.VectorLayer:
+        # Dynamic style widget loading (both Vector and Raster layers supported natively)
+        if layer.type() == 0: # VectorLayer
+            if hasattr(layer, 'geometryType') and layer.geometryType() not in [3, 4]:
+                try:
+                    from qgis.gui import QgsRendererPropertiesDialog
+                    from qgis.core import QgsStyle
+                    w = QgsRendererPropertiesDialog(layer, QgsStyle.defaultStyle(), True)
+                    self.styleWidget = w
+                    self.styleScrollArea.setWidget(w)
+                except Exception as e:
+                    import traceback
+                    self.updateLog("加载矢量图层样式面板失败: " + str(e) + "\n" + traceback.format_exc())
+        elif layer.type() == 1: # RasterLayer
             try:
-                from qgis.gui import QgsRendererPropertiesDialog
-                # Check for standard styling class properties
-                w = QgsRendererPropertiesDialog(layer, QgsStyle.defaultStyle(), True)
-                self.styleWidget = w
-                self.styleScrollArea.setWidget(w)
-            except Exception:
-                # Basic Label fallback for mock environments
-                lbl = QLabel("Symbology properties (Mocked)")
-                self.styleWidget = lbl
-                self.styleScrollArea.setWidget(lbl)
+                renderer = layer.renderer()
+                w = None
+                if renderer:
+                    r_name = renderer.__class__.__name__
+                    if r_name == 'QgsSingleBandGrayRenderer':
+                        from qgis.gui import QgsSingleBandGrayRendererWidget
+                        w = QgsSingleBandGrayRendererWidget(layer, layer.extent())
+                    elif r_name == 'QgsMultiBandColorRenderer':
+                        from qgis.gui import QgsMultiBandColorRendererWidget
+                        w = QgsMultiBandColorRendererWidget(layer, layer.extent())
+                    elif r_name == 'QgsSingleBandPseudoColorRenderer':
+                        from qgis.gui import QgsSingleBandPseudoColorRendererWidget
+                        w = QgsSingleBandPseudoColorRendererWidget(layer, layer.extent())
+                    elif r_name == 'QgsPalettedRasterRenderer':
+                        from qgis.gui import QgsPalettedRendererWidget
+                        w = QgsPalettedRendererWidget(layer, layer.extent())
+                    elif r_name == 'QgsHillshadeRenderer':
+                        from qgis.gui import QgsHillshadeRendererWidget
+                        w = QgsHillshadeRendererWidget(layer, layer.extent())
+                    
+                    if w:
+                        self.styleWidget = w
+                        self.styleScrollArea.setWidget(w)
+            except Exception as e:
+                import traceback
+                self.updateLog("加载栅格图层样式面板失败: " + str(e) + "\n" + traceback.format_exc())
+
+        if not self.styleWidget:
+            # Fallback for mock environments
+            lbl = QLabel(self.tr("图层样式配置 (Headless Mock)"))
+            self.styleWidget = lbl
+            self.styleScrollArea.setWidget(lbl)
 
     def applyStyle(self):
         w = self.styleWidget
@@ -1253,11 +1401,24 @@ class LayerBoardWidget(QWidget):
         if not w or not layer:
             return
             
-        if hasattr(w, 'apply'):
-            w.apply()
+        try:
+            if hasattr(w, 'apply'):
+                w.apply()
+            elif hasattr(w, 'renderer'):
+                new_renderer = w.renderer()
+                if new_renderer:
+                    layer.setRenderer(new_renderer.clone())
+        except Exception:
+            pass
+            
         if hasattr(layer, "setCacheImage"):
             layer.setCacheImage(None)
         layer.triggerRepaint()
+        
+        try:
+            self.iface.mapCanvas().refresh()
+        except Exception:
+            pass
 
     def clearLog(self):
         self.txtLog.clear()

@@ -187,8 +187,19 @@ def _get_layer_icon_path(layer):
     icon_name = "0_TreeMap_panel.svg"
     
     try:
-        from qgis.core import QgsMapLayer
-        layer_type = layer.type()
+        if hasattr(layer, 'isValid') and not layer.isValid():
+            return os.path.join(icons_dir, "Invalid_Layer.svg")
+            
+        provider_type = ""
+        if hasattr(layer, 'providerType'):
+            provider_type = layer.providerType()
+            
+        if provider_type == 'memory':
+            return os.path.join(icons_dir, "Memory.svg")
+        elif provider_type == 'virtual':
+            return os.path.join(icons_dir, "VirtualLayer.svg")
+            
+        layer_type = layer.type() if hasattr(layer, 'type') else None
     except Exception:
         layer_type = None
         
@@ -292,6 +303,15 @@ def _get_folder_icon_path(is_physical, path=""):
     icons_dir = os.path.join(plugin_dir, "icons_panel")
     
     if path:
+        if path == "虚拟图层" or path == "临时图层":
+            p = os.path.join(icons_dir, "Document_Temporary.svg")
+            if os.path.exists(p):
+                return p
+        elif path == "不可用图层":
+            p = os.path.join(icons_dir, "Document_Invalid.svg")
+            if os.path.exists(p):
+                return p
+                
         lower_path = path.lower()
         if lower_path.endswith('.zip'):
             zip_path = os.path.join(icons_dir, "ZIP.svg")
@@ -376,17 +396,34 @@ class FolderItem(QStandardItem):
 def get_layer_format(layer):
     if not layer:
         return "其他"
+
     try:
+        provider_type = ""
+        if hasattr(layer, 'providerType'):
+            pt = layer.providerType()
+            if isinstance(pt, str):
+                provider_type = pt.lower()
+        if provider_type == 'virtual':
+            return "虚拟图层"
+        if provider_type == 'memory':
+            return "临时图层"
+            
         provider = layer.dataProvider()
         if provider:
-            provider_name = provider.name().lower()
-            if provider_name in ['wms', 'wfs', 'wcs', 'arcgismapserver', 'arcgisfeatureserver', 'tilexyz', 'virtual']:
-                return "在线图层"
+            pn = provider.name()
+            if isinstance(pn, str):
+                provider_name = pn.lower()
+                if provider_name == 'virtual':
+                    return "虚拟图层"
+                if provider_name == 'memory':
+                    return "临时图层"
+                if provider_name in ['wms', 'wfs', 'wcs', 'arcgismapserver', 'arcgisfeatureserver', 'tilexyz', 'vectortile']:
+                    return "在线图层"
     except Exception:
         pass
         
     source = layer.source()
-    if not source:
+    if not isinstance(source, str) or not source:
         return "其他"
         
     source_lower = source.lower()
@@ -431,7 +468,10 @@ class LayerTreeModel(QStandardItemModel):
 
         layers = list(project.mapLayers().values())
         if filter_format:
-            layers = [l for l in layers if get_layer_format(l) == filter_format]
+            if filter_format == "不可用图层":
+                layers = [l for l in layers if hasattr(l, 'isValid') and not l.isValid()]
+            else:
+                layers = [l for l in layers if get_layer_format(l) == filter_format]
 
         if group_by_physical:
             self._build_physical_tree(layers)
@@ -460,28 +500,61 @@ class LayerTreeModel(QStandardItemModel):
         for layer in layers:
             if not layer:
                 continue
-            source = layer.source()
-            phys_path, _ = split_qgis_source(source)
-            actual_path = resolve_physical_path(phys_path)
-            if not actual_path or not os.path.exists(actual_path):
-                continue
                 
-            norm_actual = os.path.normpath(os.path.abspath(actual_path))
-            lower_path = norm_actual.lower()
-            
-            is_container = False
-            for ext in ['.zip', '.gpkg', '.gdb', '.tar', '.gz']:
-                if lower_path.endswith(ext):
-                    is_container = True
-                    break
-                    
-            if is_container:
-                container_path = norm_actual
-                parent_dir = os.path.dirname(norm_actual)
-            else:
+            provider_type = ""
+            try:
+                provider_type = layer.providerType()
+            except Exception:
+                pass
+                
+            is_online = False
+            format_name = get_layer_format(layer)
+            if format_name == "在线图层":
+                is_online = True
+
+            if is_online:
+                phys_path = "在线图层"
+                actual_path = ""
+                parent_dir = "在线图层"
                 container_path = None
-                parent_dir = os.path.dirname(norm_actual)
+            elif provider_type == 'virtual':
+                phys_path = "虚拟图层"
+                actual_path = ""
+                parent_dir = "虚拟图层"
+                container_path = None
+            elif provider_type == 'memory':
+                phys_path = "临时图层"
+                actual_path = ""
+                parent_dir = "临时图层"
+                container_path = None
+            else:
+                source = layer.source()
+                phys_path, _ = split_qgis_source(source)
+                actual_path = resolve_physical_path(phys_path)
                 
+                path_to_resolve = actual_path if actual_path else phys_path
+                if path_to_resolve:
+                    norm_actual = os.path.normpath(os.path.abspath(path_to_resolve))
+                    lower_path = norm_actual.lower()
+                    
+                    is_container = False
+                    for ext in ['.zip', '.gpkg', '.gdb', '.tar', '.gz']:
+                        if lower_path.endswith(ext):
+                            is_container = True
+                            break
+                            
+                    if is_container:
+                        container_path = norm_actual
+                        parent_dir = os.path.dirname(norm_actual)
+                    else:
+                        container_path = None
+                        parent_dir = os.path.dirname(norm_actual)
+                else:
+                    phys_path = "不可用图层"
+                    actual_path = ""
+                    parent_dir = "不可用图层"
+                    container_path = None
+                    
             parent_dir_paths.add(parent_dir)
             processed_items.append((layer, phys_path, parent_dir, container_path))
             
@@ -492,7 +565,7 @@ class LayerTreeModel(QStandardItemModel):
             base_name_counts[base] = base_name_counts.get(base, 0) + 1
             
         # 3. Create tree hierarchy
-        parent_dir_items = {} # parent_dir -> [FolderItem, SizeItem, total_size]
+        parent_dir_items = {} # parent_dir -> [FolderItem, SizeItem, PathItem, total_size]
         container_items = {}  # container_path -> [FolderItem, SizeItem, total_size]
         
         for layer, phys_path, parent_dir, container_path in processed_items:
@@ -502,7 +575,7 @@ class LayerTreeModel(QStandardItemModel):
             if parent_dir not in parent_dir_items:
                 base = os.path.basename(parent_dir) if parent_dir else "根目录"
                 display_name = base
-                if base_name_counts.get(base, 0) > 1 and parent_dir:
+                if base_name_counts.get(base, 0) > 1 and parent_dir and parent_dir not in ["虚拟图层", "临时图层", "不可用图层", "在线图层"]:
                     parent_dir_parent = os.path.dirname(parent_dir)
                     parent_base = os.path.basename(parent_dir_parent) if parent_dir_parent else ""
                     if parent_base:
@@ -510,7 +583,8 @@ class LayerTreeModel(QStandardItemModel):
                     else:
                         display_name = f"{base} (.../{base})"
                         
-                parent_folder_item = FolderItem(parent_dir, is_physical=True)
+                is_phys = parent_dir not in ["虚拟图层", "临时图层", "不可用图层", "在线图层"]
+                parent_folder_item = FolderItem(parent_dir, is_physical=is_phys)
                 parent_folder_item.setText(display_name)
                 parent_folder_item.setToolTip(parent_dir if parent_dir else "根目录")
                 parent_folder_item.setFlags(parent_folder_item.flags() & ~Qt.ItemIsEditable)
@@ -521,11 +595,10 @@ class LayerTreeModel(QStandardItemModel):
                 path_item_parent = QStandardItem("")
                 path_item_parent.setFlags(path_item_parent.flags() & ~Qt.ItemIsEditable)
                 
-                self.appendRow([parent_folder_item, size_item_parent, path_item_parent])
-                parent_dir_items[parent_dir] = [parent_folder_item, size_item_parent, 0]
+                parent_dir_items[parent_dir] = [parent_folder_item, size_item_parent, path_item_parent, 0]
                 
-            parent_folder_item, size_item_parent, _ = parent_dir_items[parent_dir]
-            parent_dir_items[parent_dir][2] += size
+            parent_folder_item, size_item_parent, path_item_parent, _ = parent_dir_items[parent_dir]
+            parent_dir_items[parent_dir][3] += size
             
             # b. Determine target node to append the layer node to
             if container_path:
@@ -561,14 +634,54 @@ class LayerTreeModel(QStandardItemModel):
             target_folder_item.appendRow([name_item, size_item, path_item])
             
         # Update folder total size labels
-        for parent_dir, (parent_folder_item, size_item_parent, total_size) in parent_dir_items.items():
-            size_item_parent.setText(format_size(total_size))
-            size_item_parent.setData(total_size, Qt.UserRole)
+        for parent_dir, (parent_folder_item, size_item_parent, path_item_parent, total_size) in parent_dir_items.items():
+            if parent_dir in ["虚拟图层", "临时图层", "不可用图层", "在线图层"]:
+                size_item_parent.setText("")
+                size_item_parent.setData(0, Qt.UserRole)
+            else:
+                size_item_parent.setText(format_size(total_size))
+                size_item_parent.setData(total_size, Qt.UserRole)
             
         # Update container total size labels
         for container_path, (container_folder_item, size_item_container, total_size) in container_items.items():
             size_item_container.setText(format_size(total_size))
             size_item_container.setData(total_size, Qt.UserRole)
+
+        # Sort and append folders to the model root
+        normal_dirs = []
+        special_dirs = {} # name -> [folder_item, size_item, path_item]
+        special_names = ["虚拟图层", "临时图层", "不可用图层", "在线图层"]
+        
+        for parent_dir, (folder_item, size_item, path_item, total_size) in parent_dir_items.items():
+            if parent_dir in special_names:
+                special_dirs[parent_dir] = [folder_item, size_item, path_item]
+            else:
+                normal_dirs.append((parent_dir, folder_item, size_item, path_item))
+                
+        # Sort normal directories alphabetically by display name (case-insensitive)
+        normal_dirs.sort(key=lambda x: x[1].text().lower())
+        
+        # 1. Append normal directories
+        for parent_dir, folder_item, size_item, path_item in normal_dirs:
+            self.appendRow([folder_item, size_item, path_item])
+            
+        # 2. Append separator if we have both normal directories and special directories
+        has_specials = any(name in special_dirs for name in special_names)
+        if normal_dirs and has_specials:
+            sep_item = QStandardItem("────────────────────────────────────────────────────────────────────────────────────────────────────")
+            sep_item.setFlags(Qt.NoItemFlags)
+            sep_item.setData("separator", Qt.UserRole)
+            sep_size = QStandardItem("")
+            sep_size.setFlags(Qt.NoItemFlags)
+            sep_path = QStandardItem("")
+            sep_path.setFlags(Qt.NoItemFlags)
+            self.appendRow([sep_item, sep_size, sep_path])
+            
+        # 3. Append special directories in exact order: 虚拟图层, 临时图层, 不可用图层, 在线图层
+        for name in special_names:
+            if name in special_dirs:
+                folder_item, size_item, path_item = special_dirs[name]
+                self.appendRow([folder_item, size_item, path_item])
 
     def _build_virtual_tree(self, filter_format=None):
         """Builds tree mirroring the native QGIS group/layer structure."""
@@ -587,43 +700,46 @@ class LayerTreeModel(QStandardItemModel):
                 size_item_group.setFlags(size_item_group.flags() & ~Qt.ItemIsEditable)
                 path_item_group = QStandardItem("")
                 path_item_group.setFlags(path_item_group.flags() & ~Qt.ItemIsEditable)
-                qt_parent_item.appendRow([group_item, size_item_group, path_item_group])
 
-                # Traverse recursively
+                # Traverse recursively first
                 self._traverse_qgis_tree(child, group_item, filter_format)
 
-                # Aggregate child sizes for the group size label
-                total_group_size = 0
-                for row_idx in range(group_item.rowCount()):
-                    child_size_item = group_item.child(row_idx, 1)
-                    if child_size_item:
-                        val = child_size_item.data(Qt.UserRole)
-                        if isinstance(val, (int, float)):
-                            total_group_size += val
+                # If the group has matching layers, append it to the parent
+                if group_item.rowCount() > 0:
+                    qt_parent_item.appendRow([group_item, size_item_group, path_item_group])
 
-                if total_group_size > 0:
-                    size_item_group.setText(format_size(total_group_size))
-                    size_item_group.setData(total_group_size, Qt.UserRole)
-                else:
-                    size_item_group.setText("N/A")
-                    size_item_group.setData(0, Qt.UserRole)
+                    # Aggregate child sizes for the group size label
+                    total_group_size = 0
+                    for row_idx in range(group_item.rowCount()):
+                        child_size_item = group_item.child(row_idx, 1)
+                        if child_size_item:
+                            val = child_size_item.data(Qt.UserRole)
+                            if isinstance(val, (int, float)):
+                                total_group_size += val
 
-                # If filter_format is set and the group ended up empty, prune it
-                if filter_format and group_item.rowCount() == 0:
-                    qt_parent_item.removeRow(qt_parent_item.rowCount() - 1)
+                    if total_group_size > 0:
+                        size_item_group.setText(format_size(total_group_size))
+                        size_item_group.setData(total_group_size, Qt.UserRole)
+                    else:
+                        size_item_group.setText("N/A")
+                        size_item_group.setData(0, Qt.UserRole)
 
             elif isinstance(child, QgsLayerTreeLayer):
                 layer = child.layer()
-                if layer and layer.isValid():
-                    if filter_format and get_layer_format(layer) != filter_format:
-                        continue
+                if layer:
+                    if filter_format:
+                        if filter_format == "不可用图层":
+                            if hasattr(layer, 'isValid') and layer.isValid():
+                                continue
+                        elif get_layer_format(layer) != filter_format:
+                            continue
                     source = layer.source()
                     phys_path, _ = split_qgis_source(source)
                     actual_path = resolve_physical_path(phys_path)
                     size = 0
                     if actual_path and os.path.exists(actual_path):
                         size = self._get_file_size(phys_path)
-
+                        
                     name_item = LayerItem(layer, layer.name())
                     
                     size_item = QStandardItem(format_size(size))
@@ -631,6 +747,19 @@ class LayerTreeModel(QStandardItemModel):
                     size_item.setFlags(size_item.flags() & ~Qt.ItemIsEditable)
                     
                     path_item = QStandardItem(phys_path if phys_path else "")
+                    path_item.setFlags(path_item.flags() & ~Qt.ItemIsEditable)
+                    
+                    qt_parent_item.appendRow([name_item, size_item, path_item])
+                else:
+                    layer_id = child.layerId()
+                    name_item = LayerItem(None, child.name())
+                    name_item.setData(layer_id, Qt.UserRole)
+                    
+                    size_item = QStandardItem("N/A")
+                    size_item.setData(0, Qt.UserRole)
+                    size_item.setFlags(size_item.flags() & ~Qt.ItemIsEditable)
+                    
+                    path_item = QStandardItem("不可用")
                     path_item.setFlags(path_item.flags() & ~Qt.ItemIsEditable)
                     
                     qt_parent_item.appendRow([name_item, size_item, path_item])

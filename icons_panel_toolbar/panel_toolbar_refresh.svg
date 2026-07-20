@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="32"
+   height="32"
+   viewBox="0 0 32 32"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   sodipodi:docname="0_SuperLayer_panel_toolbar.svg"
+   xml:space="preserve"
+   inkscape:export-batch-name=""
+   inkscape:export-batch-path="C:\Users\tesla\AppData\Roaming\QGIS\QGIS3\profiles\ForTest\python\plugins\SuperLayer\icons_panel_toolbar"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="true"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     inkscape:zoom="3.0507813"
+     inkscape:cx="13.766965"
+     inkscape:cy="8.3585147"
+     inkscape:window-width="1920"
+     inkscape:window-height="1001"
+     inkscape:window-x="-9"
+     inkscape:window-y="41"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer11"><inkscape:page
+       x="0"
+       y="0"
+       width="32"
+       height="32"
+       id="page16"
+       margin="0"
+       bleed="0"
+       inkscape:label="panel_toolbar_refresh" /></sodipodi:namedview><defs
+     id="defs1" /><g
+     inkscape:groupmode="layer"
+     id="layer11"
+     inkscape:label="batch modify"
+     transform="translate(-210)"><path
+       d="m 234.80687,19.713888 a 0.76599512,0.76599512 0 0 0 -0.0999,0.158907 9.4221474,9.4221474 0 1 1 0.87909,-3.978696 0.76395859,0.76395859 0 1 0 1.52791,0 c -2e-5,-6.0474906 -4.90258,-10.9500642 -10.95008,-10.9500642 -6.04749,0 -10.95007,4.9025736 -10.95007,10.9500642 0,6.047491 4.90258,10.950063 10.95007,10.950063 3.92776,0 7.47661,-2.087132 9.42215,-5.367059 v 2.565881 a 0.76395859,0.76395859 0 1 0 1.52791,0 v -5.093053 a 0.76395789,0.76395789 0 0 0 -0.76394,-0.76396 h -5.09308 a 0.76395859,0.76395859 0 1 0 0,1.527917 z"
+       p-id="17793"
+       id="path1-2"
+       style="fill:#434343;fill-opacity:1;stroke:#434343;stroke-width:1;stroke-dasharray:none;stroke-opacity:1" /></g></svg>

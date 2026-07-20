@@ -1,16 +1,25 @@
 [general]
 name=SuperLayer
 qgisMinimumVersion=3.0
-description=使用列表、文件夹树、矩形树图或图层属性看板查看与管理工程图层，支持批量修改 CRS/可见比例尺/编码、原生样式编辑、空间索引创建及物理文件移动。
-version=1.3.0
+qgisMaximumVersion=4.99
+description=使用列表、文件夹树、思维导图、矩形树图或图层属性看板管理工程图层，支持多选批量修改 CRS/编码/比例尺、原生样式编辑、空间索引创建及物理文件移动。
+version=1.4.0
 author=OpenQGIS
 email=OpenQGIS@outlook.com
-about=使用矩形树状图按文件大小查看 QGIS 图层，支持数据源更换、带样式物理文件复制，以及全功能图层属性看板（批量更新/样式/日志/导出）。
-tracker=https://github.com/google/antigravity/issues
-repository=https://github.com/google/antigravity
+about=使用思维导图或矩形树图查看 QGIS 图层，支持多选批量更新数据源/CRS/编码/可见比例尺、带样式物理文件复制、QgsDockWidget 高级集成与操作安全拦截。
+tracker=https://github.com/OpenQGIS/SuperLayer/issues
+repository=https://github.com/OpenQGIS/SuperLayer
+tags=layers, properties, table, metadata, report, board, style, mindmap
+homepage=https://github.com/OpenQGIS/SuperLayer
 category=Plugins
-icon=icons/SuperLayer.svg
+icon=icons/SuperLayer.png
 changelog=
+    Version 1.4.0:
+    * ✨ 深度整合 QgsDockWidget 属性看板：完美在 QToolBar 及 stacked_widget 中集成“属性看板”选项页，支持一键切换与数据自动刷新。/ Integrated the Layer Board page into QgsDockWidget with custom toolbars, stacked views, and auto-refresh mechanisms.
+    * ⚙️ 图层多选与批量操作增强：图层列表与物理树视图全面支持 ExtendedSelection 多选模式，极大提升图层批量移动和管理效率。/ Enabled ExtendedSelection multi-selection on list and tree views for high-efficiency batch layer operations.
+    * 🛡️ 栅格图层操作安全隔离：右键菜单中智能识别栅格与矢量图层，自动屏蔽不支持的编辑与属性表操作，从根本上杜绝软件闪退。/ Separated vector and raster menu options in context menus to prevent potential crashes on unsupported layer types.
+    * ⚠️ 磁盘异常拦截与提示：物理文件重命名、移动及数据源替换操作添加 try-except 异常捕获，通过 QMessageBox 优雅展示警告信息。/ Added try-except wrapper and error dialogs for physical file operations (rename, move, swap source) to ensure operation safety.
+    * 🎨 界面美化与用户体验优化：表格视图开启交替行背景色，工具栏视图切换按 ActionGroup 进行单选互斥，界面更加清晰专业。/ Enabled alternating row background colors and mutually-exclusive QActionGroup toggles in the toolbar for cleaner user experience.
     Version 1.3.0:
     * ✨ 新增全功能图层属性看板（属性看板页）：支持批量修改图层名称、数据源、CRS、可见比例尺范围及数据源字符编码。/ Added fully-featured Layer Board page to batch-update layer names, sources, CRS, scale visibility, and source encoding.
     * ✨ 双击就地编辑与非法输入校验：表格内双击即可安全修改图层参数，支持黄色高亮标记脏单元格，并支持统一保存（Commit）或放弃修改（Discard）。/ Enabled cell double-click inline editing with validation, yellow unsaved highlight, and Commit/Discard logic.

@@ -34,6 +34,7 @@ except ImportError:
                     UserRole = 32
                     Horizontal = 1
                     AlignLeft = 1
+                    ToolButtonTextBesideIcon = 2
                 class QHeaderView:
                     Interactive = 0
                     ResizeToContents = 1
@@ -43,9 +44,25 @@ except ImportError:
                 class QModelIndex:
                     pass
                 class QAction:
-                    def __init__(self, text, parent=None):
-                        self._text = text
-                        self.parent = parent
+                    def __init__(self, *args, **kwargs):
+                        self._icon = kwargs.get('icon', None)
+                        self._text = kwargs.get('text', "")
+                        self.parent = kwargs.get('parent', None)
+                        
+                        # Map remaining unassigned positional args to standard QAction signatures
+                        if len(args) == 1:
+                            if isinstance(args[0], str):
+                                self._text = args[0]
+                            else:
+                                self.parent = args[0]
+                        elif len(args) == 2:
+                            self._text = args[0]
+                            self.parent = args[1]
+                        elif len(args) >= 3:
+                            self._icon = args[0]
+                            self._text = args[1]
+                            self.parent = args[2]
+                            
                         self._checkable = False
                         self._checked = False
                         self.triggered = self._Signal()
@@ -88,6 +105,10 @@ except ImportError:
                         pass
                     def setSizePolicy(self, h, v):
                         pass
+                    def setToolButtonStyle(self, style):
+                        pass
+                    def setIconSize(self, size):
+                        pass
                 class QStackedWidget:
                     def __init__(self, parent=None):
                         self._widgets = []
@@ -104,12 +125,18 @@ except ImportError:
                         self._selection_model = self._SelectionModel()
                         self._selection_mode = None
                         self._alternating_row_colors = False
+                    def setObjectName(self, name):
+                        pass
                     def setModel(self, model):
                         self._model = model
                     def setContextMenuPolicy(self, policy):
                         pass
                     def setSelectionMode(self, mode):
                         self._selection_mode = mode
+                    def setSelectionBehavior(self, behavior):
+                        pass
+                    def setAllColumnsShowFocus(self, val):
+                        pass
                     def setAlternatingRowColors(self, val):
                         self._alternating_row_colors = val
                     def setEditTriggers(self, triggers):
@@ -205,6 +232,8 @@ except ImportError:
                         pass
                     def setSizePolicy(self, h, v):
                         pass
+                    def show(self): pass
+                    def hide(self): pass
                 class QDialog(QWidget):
                     def __init__(self, parent=None):
                         super().__init__(parent)
@@ -243,6 +272,7 @@ except ImportError:
                 class QAbstractItemView:
                     NoEditTriggers = 0
                     ExtendedSelection = 3
+                    SelectRows = 1
                 class QMessageBox:
                     Yes = 16384
                     No = 65536
@@ -415,6 +445,24 @@ except ImportError:
             def populateAvailableEncodingList(self): pass
 
 
+try:
+    from PyQt5.QtCore import QSize
+except ImportError:
+    try:
+        from qtpy.QtCore import QSize
+    except ImportError:
+        try:
+            from PySide2.QtCore import QSize
+        except ImportError:
+            try:
+                from PySide6.QtCore import QSize
+            except ImportError:
+                class QSize:
+                    def __init__(self, w, h):
+                        self.w = w
+                        self.h = h
+
+
 class SuperLayerDockWidget(QDialog):
     """The main QDialog container integrating flat list view, directory tree view,
     treemap view, toolbar controls, and context menu actions."""
@@ -466,11 +514,17 @@ class SuperLayerDockWidget(QDialog):
         self.layout.addWidget(self.stacked_widget, 1)
         
         self.physical_tree_view = QTreeView()
+        self.physical_tree_view.setObjectName("physicalTreeView")
         self.physical_tree_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.physical_tree_view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.physical_tree_view.setAllColumnsShowFocus(True)
         self.physical_tree_view.setAlternatingRowColors(True)
         
         self.group_tree_view = QTreeView()
+        self.group_tree_view.setObjectName("groupTreeView")
         self.group_tree_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.group_tree_view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.group_tree_view.setAllColumnsShowFocus(True)
         self.group_tree_view.setAlternatingRowColors(True)
         
         self.treemap_view = TreeMapWidget()
@@ -507,15 +561,16 @@ class SuperLayerDockWidget(QDialog):
             QToolBar {
                 background: #f8f9fa;
                 border-bottom: 1px solid #dee2e6;
-                spacing: 4px;
-                padding: 4px;
+                spacing: 2px;
+                padding: 2px;
             }
             QToolBar QToolButton {
                 background: transparent;
                 border: 1px solid transparent;
                 border-radius: 4px;
-                padding: 4px 8px;
+                padding: 2px 1px;
                 font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+                font-size: 13px;
                 font-weight: 500;
                 color: #495057;
             }
@@ -527,22 +582,34 @@ class SuperLayerDockWidget(QDialog):
                 background: #0d6efd;
                 color: white;
             }
-            QTreeView, QGraphicsView {
+            QStackedWidget > QTreeView, QGraphicsView {
                 background-color: #ffffff;
                 border: none;
                 alternate-background-color: #f8f9fa;
-                selection-background-color: #e7f1ff;
-                selection-color: #0c63e4;
+                selection-background-color: #1484dc;
+                selection-color: #ffffff;
                 font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
                 font-size: 12px;
                 color: #212529;
             }
-            QTreeView::item {
-                padding: 6px;
+            QStackedWidget > QTreeView::item {
+                height: 25px;
                 border-bottom: 1px solid #f1f3f5;
             }
-            QTreeView::item:hover {
+            QStackedWidget > QTreeView::item:hover:!selected {
                 background-color: #f1f3f5;
+            }
+            QStackedWidget > QTreeView::item:selected {
+                background-color: #1484dc;
+                color: #ffffff;
+            }
+            QStackedWidget > QTreeView::item:selected:active {
+                background-color: #1484dc;
+                color: #ffffff;
+            }
+            QStackedWidget > QTreeView::item:selected:!active {
+                background-color: #1484dc;
+                color: #ffffff;
             }
             QHeaderView::section {
                 background-color: #f8f9fa;
@@ -555,36 +622,50 @@ class SuperLayerDockWidget(QDialog):
         """)
 
     def _setup_toolbar(self):
+        if hasattr(self.toolbar, 'setToolButtonStyle') and hasattr(Qt, 'ToolButtonTextBesideIcon'):
+            self.toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+            
+        if hasattr(self.toolbar, 'setIconSize'):
+            self.toolbar.setIconSize(QSize(16, 16))
+            
+        icon_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons_panel_toolbar")
+        
+        def get_toolbar_icon(name):
+            icon_path = os.path.join(icon_dir, name)
+            if os.path.exists(icon_path):
+                return QIcon(icon_path)
+            return QIcon()
+            
         self.view_group = QActionGroup(self)
         self.view_group.setExclusive(True)
         
-        self.act_physical_tree = QAction("物理文件夹", self)
+        self.act_physical_tree = QAction(get_toolbar_icon("panel_toolbar_document.svg"), "文件夹分类", self)
         self.act_physical_tree.setCheckable(True)
         self.act_physical_tree.setChecked(True)
         self.act_physical_tree.triggered.connect(lambda: self.switch_view(0))
         self.view_group.addAction(self.act_physical_tree)
         self.toolbar.addAction(self.act_physical_tree)
         
-        self.act_group_tree = QAction("图层组", self)
+        self.act_group_tree = QAction(get_toolbar_icon("panel_toolbar_group.svg"), "图层分类", self)
         self.act_group_tree.setCheckable(True)
         self.act_group_tree.triggered.connect(lambda: self.switch_view(1))
         self.view_group.addAction(self.act_group_tree)
         self.toolbar.addAction(self.act_group_tree)
         
-        self.act_treemap = QAction("矩形树状图", self)
+        self.act_treemap = QAction(get_toolbar_icon("panel_toolbar_Rec-Tree_Chart.svg"), "矩形树状图", self)
         self.act_treemap.setCheckable(True)
         self.act_treemap.triggered.connect(lambda: self.switch_view(2))
         self.view_group.addAction(self.act_treemap)
         self.toolbar.addAction(self.act_treemap)
         
-        self.act_mindmap = QAction("思维导图", self)
+        self.act_mindmap = QAction(get_toolbar_icon("panel_toolbar_Mindmap.svg"), "路径导图", self)
         self.act_mindmap.setCheckable(True)
         self.act_mindmap.triggered.connect(lambda: self.switch_view(3))
         self.view_group.addAction(self.act_mindmap)
         self.toolbar.addAction(self.act_mindmap)
         
         # Add new Attribute Board Action
-        self.act_layer_board = QAction("属性看板", self)
+        self.act_layer_board = QAction(get_toolbar_icon("panel_toolbar_batch-modify.svg"), "批量修改", self)
         self.act_layer_board.setCheckable(True)
         self.act_layer_board.triggered.connect(lambda: self.switch_view(4))
         self.view_group.addAction(self.act_layer_board)
@@ -592,7 +673,7 @@ class SuperLayerDockWidget(QDialog):
         
         self.toolbar.addSeparator()
         
-        self.act_refresh = QAction("刷新", self)
+        self.act_refresh = QAction(get_toolbar_icon("panel_toolbar_refresh.svg"), "刷新", self)
         self.act_refresh.triggered.connect(self.refresh)
         self.toolbar.addAction(self.act_refresh)
 
@@ -663,13 +744,18 @@ class SuperLayerDockWidget(QDialog):
                 
         project = QgsProject.instance()
         formats = set()
+        has_invalid = False
         if project:
             for layer in project.mapLayers().values():
+                if hasattr(layer, 'isValid') and not layer.isValid():
+                    has_invalid = True
                 fmt = get_layer_format(layer)
                 if fmt:
                     formats.add(fmt.upper())
+            if has_invalid:
+                formats.add("不可用图层")
                     
-        priority = {"SHP": 1, "GPKG": 2, "GDB": 3, "TIF": 4, "TIFF": 5, "在线图层": 10, "其他": 20}
+        priority = {"SHP": 1, "GPKG": 2, "GDB": 3, "TIF": 4, "TIFF": 5, "在线图层": 10, "不可用图层": 15, "其他": 20}
         sorted_formats = sorted(list(formats), key=lambda x: (priority.get(x, 5), x))
         
         if self.current_filter_format and self.current_filter_format not in sorted_formats:
@@ -720,21 +806,29 @@ class SuperLayerDockWidget(QDialog):
         self.act_layer_board.setChecked(index == 4) # NEW
         self.stacked_widget.setCurrentIndex(index)
         
+        if index == 4:
+            self.filter_container.hide()
+        else:
+            self.filter_container.show()
+        
         filter_str = self.current_filter_format.lower() if self.current_filter_format else None
         project = QgsProject.instance()
         layers = []
         if project:
+            try:
+                from .layer_model import get_layer_format
+            except ImportError:
+                def get_layer_format(l):
+                    source = getattr(l, 'source', lambda: '')()
+                    if source.endswith('.shp'): return 'shp'
+                    if source.endswith('.tif'): return 'tif'
+                    return 'other'
             all_layers = list(project.mapLayers().values())
             if filter_str:
-                try:
-                    from .layer_model import get_layer_format
-                except ImportError:
-                    def get_layer_format(l):
-                        source = getattr(l, 'source', lambda: '')()
-                        if source.endswith('.shp'): return 'shp'
-                        if source.endswith('.tif'): return 'tif'
-                        return 'other'
-                layers = [l for l in all_layers if get_layer_format(l) == filter_str]
+                if filter_str == "不可用图层":
+                    layers = [l for l in all_layers if hasattr(l, 'isValid') and not l.isValid()]
+                else:
+                    layers = [l for l in all_layers if get_layer_format(l) == filter_str]
             else:
                 layers = all_layers
                 
@@ -775,6 +869,14 @@ class SuperLayerDockWidget(QDialog):
             # 3. Re-apply column widths (model rebuild resets them)
             self._apply_column_widths()
             
+            # Make the separator row span across all columns to prevent text truncation
+            model = self.physical_model
+            for row in range(model.rowCount()):
+                item = model.item(row, 0)
+                if item and item.data(Qt.UserRole) == "separator":
+                    self.physical_tree_view.setFirstColumnSpanned(row, QModelIndex(), True)
+                    break
+            
             # Expand physical tree recursively, keep group tree collapsed
             self.physical_tree_view.expandAll()
             self.group_tree_view.collapseAll()
@@ -782,17 +884,20 @@ class SuperLayerDockWidget(QDialog):
             project = QgsProject.instance()
             layers = []
             if project:
+                try:
+                    from .layer_model import get_layer_format
+                except ImportError:
+                    def get_layer_format(l):
+                        source = getattr(l, 'source', lambda: '')()
+                        if source.endswith('.shp'): return 'shp'
+                        if source.endswith('.tif'): return 'tif'
+                        return 'other'
                 all_layers = list(project.mapLayers().values())
                 if filter_str:
-                    try:
-                        from .layer_model import get_layer_format
-                    except ImportError:
-                        def get_layer_format(l):
-                            source = getattr(l, 'source', lambda: '')()
-                            if source.endswith('.shp'): return 'shp'
-                            if source.endswith('.tif'): return 'tif'
-                            return 'other'
-                    layers = [l for l in all_layers if get_layer_format(l) == filter_str]
+                    if filter_str == "不可用图层":
+                        layers = [l for l in all_layers if hasattr(l, 'isValid') and not l.isValid()]
+                    else:
+                        layers = [l for l in all_layers if get_layer_format(l) == filter_str]
                 else:
                     layers = all_layers
             
@@ -870,22 +975,49 @@ class SuperLayerDockWidget(QDialog):
 
     def show_physical_tree_context_menu(self, pos):
         idx = self.physical_tree_view.indexAt(pos)
-        if idx.isValid() and idx.column() == 0:
+        if idx.isValid():
             model = self.physical_tree_view.model()
-            item = model.itemFromIndex(idx)
+            col0_idx = idx.sibling(idx.row(), 0)
+            item = model.itemFromIndex(col0_idx)
             if item:
-                if isinstance(item, FolderItem) and item.is_physical and item.folder_path:
-                    self._create_folder_context_menu(item.folder_path, self.physical_tree_view.mapToGlobal(pos))
+                if idx.column() == 2 or (isinstance(item, FolderItem) and item.is_physical):
+                    folder_path = None
+                    if isinstance(item, FolderItem):
+                        folder_path = item.folder_path
+                    elif isinstance(item, LayerItem) and item.layer:
+                        source = item.layer.source()
+                        phys_path, _ = split_qgis_source(source)
+                        actual_path = resolve_physical_path(phys_path)
+                        if actual_path:
+                            folder_path = os.path.dirname(actual_path)
+                    
+                    if folder_path:
+                        self._create_folder_context_menu(folder_path, self.physical_tree_view.mapToGlobal(pos))
                 elif isinstance(item, LayerItem):
                     self._create_layer_context_menu([item.layer], self.physical_tree_view.mapToGlobal(pos))
 
     def show_group_tree_context_menu(self, pos):
         idx = self.group_tree_view.indexAt(pos)
-        if idx.isValid() and idx.column() == 0:
+        if idx.isValid():
             model = self.group_tree_view.model()
-            item = model.itemFromIndex(idx)
-            if item and isinstance(item, LayerItem):
-                self._create_layer_context_menu([item.layer], self.group_tree_view.mapToGlobal(pos))
+            col0_idx = idx.sibling(idx.row(), 0)
+            item = model.itemFromIndex(col0_idx)
+            if item:
+                if idx.column() == 2:
+                    folder_path = None
+                    if isinstance(item, FolderItem):
+                        folder_path = item.folder_path
+                    elif isinstance(item, LayerItem) and item.layer:
+                        source = item.layer.source()
+                        phys_path, _ = split_qgis_source(source)
+                        actual_path = resolve_physical_path(phys_path)
+                        if actual_path:
+                            folder_path = os.path.dirname(actual_path)
+                    
+                    if folder_path:
+                        self._create_folder_context_menu(folder_path, self.group_tree_view.mapToGlobal(pos))
+                elif isinstance(item, LayerItem):
+                    self._create_layer_context_menu([item.layer], self.group_tree_view.mapToGlobal(pos))
 
     def show_treemap_context_menu(self, node, global_pos):
         if node.layer:
@@ -899,21 +1031,6 @@ class SuperLayerDockWidget(QDialog):
             return
             
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #ffffff;
-                border: 1px solid #dee2e6;
-                padding: 4px;
-            }
-            QMenu::item {
-                padding: 6px 20px;
-                color: #212529;
-            }
-            QMenu::item:selected {
-                background-color: #e7f1ff;
-                color: #0c63e4;
-            }
-        """)
         
         act_open_folder = menu.addAction("打开文件夹位置")
         
@@ -921,6 +1038,11 @@ class SuperLayerDockWidget(QDialog):
         icon_path = os.path.join(plugin_dir, "icons_component", "Open_File_Location.svg")
         if os.path.exists(icon_path):
             act_open_folder.setIcon(QIcon(icon_path))
+            
+        act_copy_link = menu.addAction("复制文件夹链接")
+        copy_icon_path = os.path.join(plugin_dir, "icons_component", "Copy_Folder_Link.svg")
+        if os.path.exists(copy_icon_path):
+            act_copy_link.setIcon(QIcon(copy_icon_path))
             
         def on_open():
             try:
@@ -939,7 +1061,16 @@ class SuperLayerDockWidget(QDialog):
             except Exception as e:
                 QMessageBox.warning(self, "操作失败", f"打开文件夹失败: {str(e)}")
                 
+        def on_copy():
+            try:
+                from PyQt5.QtWidgets import QApplication
+                norm_path = os.path.normpath(actual_path)
+                QApplication.clipboard().setText(norm_path)
+            except Exception as e:
+                QMessageBox.warning(self, "操作失败", f"复制文件夹链接失败: {str(e)}")
+                
         act_open_folder.triggered.connect(on_open)
+        act_copy_link.triggered.connect(on_copy)
         menu.exec_(global_pos)
 
     def handle_layer_relocation(self, layer_id, target_folder_path):

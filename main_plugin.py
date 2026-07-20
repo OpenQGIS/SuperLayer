@@ -75,6 +75,8 @@ class SuperLayerPlugin:
         if not self.dock:
             self.dock = SuperLayerDockWidget(self.iface, self.iface.mainWindow())
         
+        if self.dock.isMinimized():
+            self.dock.showNormal()
         self.dock.show()
         self.dock.raise_()
         self.dock.activateWindow()
