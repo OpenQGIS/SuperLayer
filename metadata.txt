@@ -2,11 +2,11 @@
 name=SuperLayer
 qgisMinimumVersion=3.0
 qgisMaximumVersion=4.99
-description=使用列表、文件夹树、思维导图、矩形树图或图层属性看板管理工程图层，支持多选批量修改 CRS/编码/比例尺、原生样式编辑、空间索引创建及物理文件移动。
-version=1.4.0
+description=使用列表、文件夹树、思维导图、矩形树图或图层属性看板管理工程图层，支持右键菜单移动/复制/备份物理文件、样式管理、删除图层与删除文件等高级操作。
+version=1.5.0
 author=OpenQGIS
 email=OpenQGIS@outlook.com
-about=使用思维导图或矩形树图查看 QGIS 图层，支持多选批量更新数据源/CRS/编码/可见比例尺、带样式物理文件复制、QgsDockWidget 高级集成与操作安全拦截。
+about=使用思维导图或矩形树图查看 QGIS 图层，支持多选批量更新数据源/CRS/编码/可见比例尺；右键菜单提供移动、复制、备份物理文件（可选是否从新路径加载）；样式管理支持保存与清除默认样式；并可直接删除图层或永久删除物理文件（含确认保护）。
 tracker=https://github.com/OpenQGIS/SuperLayer/issues
 repository=https://github.com/OpenQGIS/SuperLayer
 tags=layers, properties, table, metadata, report, board, style, mindmap
@@ -14,6 +14,12 @@ homepage=https://github.com/OpenQGIS/SuperLayer
 category=Plugins
 icon=icons/SuperLayer.png
 changelog=
+    Version 1.5.0:
+    * 🗂️ 右键菜单全面重构：拆分为「移动」「复制」「备份」三个独立文件操作动作，分别通过鼠标悬停提示明示加载路径差异（从新路径/从原始路径加载）。/ Refactored context menu: separated Move, Copy, and Backup file actions with distinct hover tooltips indicating load path behavior.
+    * 🎨 新增「样式管理」子菜单：支持「保存为默认样式」（调用 QGIS 官方 API）与「清除默认样式」（删除磁盘 .qml 文件并重置渲染器）。/ Added Style Management submenu with Save/Clear default style actions using QGIS native API and on-disk .qml management.
+    * 🗑️ 新增「删除图层」与「删除文件」：前者仅从 QGIS 工程移除图层，后者永久删除磁盘物理文件（含全部伴生文件）并附带确认弹窗保护。/ Added Remove Layer (QGIS-only) and Delete Files (permanent disk deletion with confirmation dialog) context menu actions.
+    * 🖼️ 新增专属图标：为所有新菜单项挂载对应 SVG 图标（Delete_Layer.svg、Delete_Files.svg、Style_Manage.svg、Save_stlye.svg、delete_stlye.svg、Copy_Folder_Link.svg）。/ Mounted dedicated SVG icons for all new menu actions.
+    * 🐛 修复思维导图拖拽线段 RuntimeError：scene.clear() 销毁 QGraphicsLineItem 后引发的悬空引用崩溃，通过 sip.isdeleted() 双重守卫解决。/ Fixed mindmap drag line RuntimeError caused by dangling C++ reference after scene.clear() via sip.isdeleted() double-guard.
     Version 1.4.0:
     * ✨ 深度整合 QgsDockWidget 属性看板：完美在 QToolBar 及 stacked_widget 中集成“属性看板”选项页，支持一键切换与数据自动刷新。/ Integrated the Layer Board page into QgsDockWidget with custom toolbars, stacked views, and auto-refresh mechanisms.
     * ⚙️ 图层多选与批量操作增强：图层列表与物理树视图全面支持 ExtendedSelection 多选模式，极大提升图层批量移动和管理效率。/ Enabled ExtendedSelection multi-selection on list and tree views for high-efficiency batch layer operations.

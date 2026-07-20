@@ -629,6 +629,7 @@ class MindMapView(QGraphicsView):
         collapse_states = self._get_current_collapse_states()
         
         self.scene_obj.clear()
+        self._drag_line_item = None  # scene.clear() destroys all C++ items; reset the reference
         
         # 1. Build Physical Directory Tree
         self.root_node = self._build_path_tree(layers, collapse_states)
@@ -644,6 +645,7 @@ class MindMapView(QGraphicsView):
     def rebuild_and_draw(self):
         """Re-calculates the tree layout structure and draws items."""
         self.scene_obj.clear()
+        self._drag_line_item = None  # scene.clear() destroys all C++ items; reset the reference
         if not self.root_node:
             return
             
@@ -969,6 +971,14 @@ class MindMapView(QGraphicsView):
         self._drag_source_item = item
         self._drag_start_pos = start_scene_pos
         
+        # Guard: also treat a sip-deleted C++ object as absent
+        try:
+            import sip
+            if self._drag_line_item is not None and sip.isdeleted(self._drag_line_item):
+                self._drag_line_item = None
+        except Exception:
+            pass
+
         if not self._drag_line_item:
             try:
                 from PyQt5.QtWidgets import QGraphicsLineItem

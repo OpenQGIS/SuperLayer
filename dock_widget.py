@@ -248,6 +248,10 @@ except ImportError:
                 class QMenu:
                     def __init__(self, parent=None):
                         pass
+                    def setStyleSheet(self, style):
+                        pass
+                    def setIconSize(self, size):
+                        pass
                     def addAction(self, text):
                         return QAction(text, self)
                     def addMenu(self, text):
@@ -1031,6 +1035,25 @@ class SuperLayerDockWidget(QDialog):
             return
             
         menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #ffffff;
+                border: 1px solid #dee2e6;
+                padding: 4px 0px;
+                icon-size: 16px;
+            }
+            QMenu::item {
+                margin-left: 3px;
+                padding: 5px 12px 5px 6px;
+                font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+                font-size: 12px;
+                color: #212529;
+            }
+            QMenu::item:selected {
+                background-color: #1484dc;
+                color: #ffffff;
+            }
+        """)
         
         act_open_folder = menu.addAction("打开文件夹位置")
         
@@ -1157,6 +1180,25 @@ class SuperLayerDockWidget(QDialog):
 
     def _create_layer_context_menu(self, layers, global_pos):
         menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #ffffff;
+                border: 1px solid #dee2e6;
+                padding: 4px 0px;
+                icon-size: 16px;
+            }
+            QMenu::item {
+                margin-left: 3px;
+                padding: 5px 12px 5px 6px;
+                font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+                font-size: 12px;
+                color: #212529;
+            }
+            QMenu::item:selected {
+                background-color: #1484dc;
+                color: #ffffff;
+            }
+        """)
         
         plugin_dir = os.path.dirname(os.path.abspath(__file__))
         icons_dir = os.path.join(plugin_dir, "icons_component")
@@ -1170,13 +1212,9 @@ class SuperLayerDockWidget(QDialog):
         if len(layers) == 1:
             layer = layers[0]
             
-            act_datasource = menu.addAction("更换数据源...")
+            act_datasource = menu.addAction("更换数据源")
             act_datasource.triggered.connect(lambda: self.action_change_datasource(layer))
             set_icon(act_datasource, "Change_Data_Source.svg")
-            
-            act_copy_style = menu.addAction("复制并保留样式到新文件夹...")
-            act_copy_style.triggered.connect(lambda: self.action_copy_with_style(layer))
-            set_icon(act_copy_style, "Copy_to_new_folder.svg")
             
             act_open_folder = menu.addAction("打开文件位置")
             act_open_folder.triggered.connect(lambda: self.action_open_containing_folder(layer))
@@ -1184,24 +1222,42 @@ class SuperLayerDockWidget(QDialog):
             
             menu.addSeparator()
             
+            act_move = menu.addAction("移动选中的 1 个文件到…")
+            act_move.triggered.connect(lambda: self.action_move_files([layer]))
+            act_move.setToolTip("从新路径加载文件")
+            set_icon(act_move, "Move_File.svg")
+            
+            act_copy = menu.addAction("复制选中的 1 个文件到…")
+            act_copy.triggered.connect(lambda: self.action_copy_files([layer]))
+            act_copy.setToolTip("从新路径加载文件")
+            set_icon(act_copy, "Copy_to_new_folder.svg")
+
+            act_backup = menu.addAction("备份选中的 1 个文件到…")
+            act_backup.triggered.connect(lambda: self.action_backup_files([layer]))
+            act_backup.setToolTip("从原始路径加载文件")
+            set_icon(act_backup, "Copy_to_new_folder.svg")
+            
+            menu.addSeparator()
+            
             edit_menu = menu.addMenu("图层编辑")
             set_icon(edit_menu, "Layer_Editing.svg")
             
-            # Toggle edit
+            # Toggle edit (retained for vector layers to support native edits and tests)
             if isinstance(layer, QgsVectorLayer):
                 pencil_label = "停止编辑" if layer.isEditable() else "开始编辑"
                 act_toggle_edit = edit_menu.addAction(pencil_label)
                 act_toggle_edit.triggered.connect(lambda: self.action_toggle_edit(layer))
                 set_icon(act_toggle_edit, "Start_Editing.svg")
             
-            act_rename_layer = edit_menu.addAction("重命名图层...")
+            act_rename_layer = edit_menu.addAction("重命名图层名")
             act_rename_layer.triggered.connect(lambda: self.action_rename_layer(layer))
             set_icon(act_rename_layer, "Rename_Layer.svg")
             
-            act_rename_file = edit_menu.addAction("重命名物理文件...")
+            act_rename_file = edit_menu.addAction("重命名原始文件名")
             act_rename_file.triggered.connect(lambda: self.action_rename_file(layer))
             set_icon(act_rename_file, "Renamed_the_original_file.svg")
             
+            # Attribute table (retained for vector layers to support native edits and tests)
             if isinstance(layer, QgsVectorLayer):
                 act_open_attrs = edit_menu.addAction("打开属性表")
                 act_open_attrs.triggered.connect(lambda: self.action_open_attribute_table(layer))
@@ -1210,12 +1266,46 @@ class SuperLayerDockWidget(QDialog):
             act_properties = edit_menu.addAction("打开图层属性")
             act_properties.triggered.connect(lambda: self.action_open_properties(layer))
             set_icon(act_properties, "Open_Layer_Properties.svg")
+
+            style_menu = menu.addMenu("样式管理")
+            set_icon(style_menu, "Style_Manage.svg")
+
+            act_clear_style = style_menu.addAction("清除默认样式")
+            act_clear_style.triggered.connect(lambda: self.action_clear_default_style(layer))
+            set_icon(act_clear_style, "delete_stlye.svg")
+
+            act_save_style = style_menu.addAction("保存为默认样式")
+            act_save_style.triggered.connect(lambda: self.action_save_as_default_style(layer))
+            set_icon(act_save_style, "Save_stlye.svg")
+
+            menu.addSeparator()
+
+            act_remove_layer = menu.addAction("删除图层")
+            act_remove_layer.triggered.connect(lambda: self.action_remove_layer(layer))
+            set_icon(act_remove_layer, "Delete_Layer.svg")
+
+            menu.addSeparator()
+
+            act_delete_files = menu.addAction("删除文件")
+            act_delete_files.triggered.connect(lambda: self.action_delete_files(layer))
+            set_icon(act_delete_files, "Delete_Files.svg")
         
-        # Multi-select actions
-        if len(layers) >= 1:
-            act_move = menu.addAction(f"移动选中的 {len(layers)} 个文件...")
+        else:
+            # Multi-select actions
+            act_move = menu.addAction(f"移动选中的 {len(layers)} 个文件到…")
             act_move.triggered.connect(lambda: self.action_move_files(layers))
+            act_move.setToolTip("从新路径加载文件")
             set_icon(act_move, "Move_File.svg")
+            
+            act_copy = menu.addAction(f"复制选中的 {len(layers)} 个文件到…")
+            act_copy.triggered.connect(lambda: self.action_copy_files(layers))
+            act_copy.setToolTip("从新路径加载文件")
+            set_icon(act_copy, "Copy_to_new_folder.svg")
+
+            act_backup = menu.addAction(f"备份选中的 {len(layers)} 个文件到…")
+            act_backup.triggered.connect(lambda: self.action_backup_files(layers))
+            act_backup.setToolTip("从原始路径加载文件")
+            set_icon(act_backup, "Copy_to_new_folder.svg")
 
         menu.exec_(global_pos)
 
@@ -1251,43 +1341,120 @@ class SuperLayerDockWidget(QDialog):
             QMessageBox.warning(self, "操作失败", "该图层没有有效的本地物理数据路径。")
 
     def action_copy_with_style(self, layer):
-        initial_dir = os.path.dirname(layer.source()) if layer.source() else ""
+        self.action_copy_files([layer])
+
+    def action_copy_files(self, layers):
+        if not layers:
+            return
+        initial_dir = os.path.dirname(layers[0].source()) if layers[0].source() else ""
         target_dir = QFileDialog.getExistingDirectory(self, "选择复制目标文件夹", initial_dir)
         if target_dir:
             try:
-                # Copy files
-                safe_copy(layer.source(), target_dir)
-                # Load new layer in QGIS
-                new_path = os.path.join(target_dir, os.path.basename(layer.source()))
-                new_layer = None
-                
-                # Use dynamic checking of layer type
-                if isinstance(layer, QgsVectorLayer):
-                    new_layer = QgsVectorLayer(new_path, f"{layer.name()} (复制)", layer.dataProvider().name())
-                elif isinstance(layer, QgsRasterLayer):
-                    new_layer = QgsRasterLayer(new_path, f"{layer.name()} (复制)", layer.dataProvider().name())
-                else:
-                    # General fallback if layer type cannot be determined
-                    from qgis.core import QgsProviderRegistry
-                    # Auto detect vector/raster using provider registry or extension
-                    ext = os.path.splitext(new_path)[1].lower()
-                    vector_exts = ['.shp', '.geojson', '.gpkg', '.kml', '.tab']
-                    if ext in vector_exts:
-                        new_layer = QgsVectorLayer(new_path, f"{layer.name()} (复制)", "ogr")
+                for layer in layers:
+                    # Copy files
+                    safe_copy(layer.source(), target_dir)
+                    # Load new layer in QGIS
+                    new_path = os.path.join(target_dir, os.path.basename(layer.source()))
+                    new_layer = None
+                    
+                    # Use dynamic checking of layer type
+                    if isinstance(layer, QgsVectorLayer):
+                        new_layer = QgsVectorLayer(new_path, f"{layer.name()} (复制)", layer.dataProvider().name())
+                    elif isinstance(layer, QgsRasterLayer):
+                        new_layer = QgsRasterLayer(new_path, f"{layer.name()} (复制)", layer.dataProvider().name())
                     else:
-                        new_layer = QgsRasterLayer(new_path, f"{layer.name()} (复制)", "gdal")
+                        # General fallback if layer type cannot be determined
+                        from qgis.core import QgsProviderRegistry
+                        # Auto detect vector/raster using provider registry or extension
+                        ext = os.path.splitext(new_path)[1].lower()
+                        vector_exts = ['.shp', '.geojson', '.gpkg', '.kml', '.tab']
+                        if ext in vector_exts:
+                            new_layer = QgsVectorLayer(new_path, f"{layer.name()} (复制)", "ogr")
+                        else:
+                            new_layer = QgsRasterLayer(new_path, f"{layer.name()} (复制)", "gdal")
 
-                if new_layer and new_layer.isValid():
-                    QgsProject.instance().addMapLayer(new_layer)
-                    # Apply original symbology
-                    if hasattr(layer, 'renderer') and layer.renderer():
-                        new_layer.setRenderer(layer.renderer().clone())
-                    if hasattr(layer, 'labeling') and layer.labeling():
-                        new_layer.setLabeling(layer.labeling().clone())
-                    new_layer.triggerRepaint()
-                    self.refresh()
+                    if new_layer and new_layer.isValid():
+                        QgsProject.instance().addMapLayer(new_layer)
+                        # Apply original symbology
+                        if hasattr(layer, 'renderer') and layer.renderer():
+                            new_layer.setRenderer(layer.renderer().clone())
+                        if hasattr(layer, 'labeling') and layer.labeling():
+                            new_layer.setLabeling(layer.labeling().clone())
+                        new_layer.triggerRepaint()
+                self.refresh()
             except Exception as e:
                 QMessageBox.warning(self, "操作失败", f"复制并应用样式失败: {str(e)}")
+
+    def action_backup_files(self, layers):
+        if not layers:
+            return
+        initial_dir = os.path.dirname(layers[0].source()) if layers[0].source() else ""
+        target_dir = QFileDialog.getExistingDirectory(self, "选择备份目标文件夹", initial_dir)
+        if target_dir:
+            try:
+                for layer in layers:
+                    safe_copy(layer.source(), target_dir)
+                QMessageBox.information(self, "备份成功", f"成功备份选中的 {len(layers)} 个图层文件到目标目录。")
+                self.refresh()
+            except Exception as e:
+                QMessageBox.warning(self, "操作失败", f"备份文件失败: {str(e)}")
+
+    def action_clear_default_style(self, layer):
+        source_path = layer.source()
+        if not source_path:
+            QMessageBox.warning(self, "操作失败", "该图层没有有效的数据源路径。")
+            return
+        
+        # 1. Resolve physical path
+        phys_path, _ = split_qgis_source(source_path)
+        actual_path = resolve_physical_path(phys_path)
+        if not actual_path:
+            QMessageBox.warning(self, "操作失败", "该图层没有有效的数据源物理路径。")
+            return
+            
+        base_path, _ = os.path.splitext(actual_path)
+        qml_path = base_path + ".qml"
+        
+        deleted_file = False
+        if os.path.exists(qml_path):
+            try:
+                os.remove(qml_path)
+                deleted_file = True
+            except Exception as e:
+                QMessageBox.warning(self, "操作失败", f"清除默认样式文件失败: {str(e)}")
+                return
+        
+        # 2. Reset style manager & renderer in memory
+        try:
+            layer.styleManager().reset()
+            from qgis.core import QgsFeatureRenderer
+            if hasattr(layer, 'geometryType'):
+                default_renderer = QgsFeatureRenderer.defaultRenderer(layer.geometryType())
+                layer.setRenderer(default_renderer)
+            layer.triggerRepaint()
+        except Exception:
+            pass
+            
+        if deleted_file:
+            QMessageBox.information(self, "操作成功", f"默认样式文件已成功清除并重置图层样式。")
+        else:
+            QMessageBox.information(self, "操作成功", "图层样式已成功重置为默认状态。")
+        self.refresh()
+
+    def action_save_as_default_style(self, layer):
+        try:
+            res = layer.saveDefaultStyle()
+            if isinstance(res, tuple) and len(res) == 2:
+                msg, success = res
+            else:
+                msg, success = "", True
+            
+            if success:
+                QMessageBox.information(self, "保存成功", "当前样式已成功保存为默认样式。")
+            else:
+                QMessageBox.warning(self, "操作失败", f"保存默认样式失败: {msg}")
+        except Exception as e:
+            QMessageBox.warning(self, "操作失败", f"保存默认样式失败: {str(e)}")
 
     def action_toggle_edit(self, layer):
         if layer.isEditable():
@@ -1304,7 +1471,12 @@ class SuperLayerDockWidget(QDialog):
 
     def action_rename_file(self, layer):
         old_filename = os.path.basename(layer.source())
-        new_name, ok = QInputDialog.getText(self, "重命名物理文件", "请输入新的物理文件名 (包含后缀):", text=old_filename)
+        new_name, ok = QInputDialog.getText(
+            self, 
+            "重命名原始物理文件", 
+            "请输入新的物理文件名 (包含后缀，重命名后图层将自动以新的文件名载入):", 
+            text=old_filename
+        )
         if ok and new_name and new_name != old_filename:
             try:
                 safe_rename(layer, new_name)
@@ -1332,3 +1504,55 @@ class SuperLayerDockWidget(QDialog):
                 self.refresh()
             except Exception as e:
                 QMessageBox.warning(self, "操作失败", f"移动文件失败: {str(e)}")
+
+    def action_remove_layer(self, layer):
+        """从 QGIS 工程中移除图层（不删除物理文件）。"""
+        try:
+            QgsProject.instance().removeMapLayer(layer.id())
+            self.refresh()
+        except Exception as e:
+            QMessageBox.warning(self, "操作失败", f"删除图层失败: {str(e)}")
+
+    def action_delete_files(self, layer):
+        """删除图层对应的物理文件（含所有伴生文件），同时从工程中移除图层。需用户确认。"""
+        source_path = layer.source()
+        phys_path, _ = split_qgis_source(source_path)
+        actual_path = resolve_physical_path(phys_path)
+
+        if not actual_path or not os.path.exists(actual_path):
+            QMessageBox.warning(self, "操作失败", "该图层没有有效的本地物理文件路径，无法删除。")
+            return
+
+        associated = get_associated_files(source_path)
+        file_list = "\n".join(f"  • {os.path.basename(f)}" for f in associated) if associated else f"  • {os.path.basename(actual_path)}"
+
+        reply = QMessageBox.warning(
+            self,
+            "确认删除文件",
+            f"此操作将永久删除以下物理文件，且无法恢复：\n\n{file_list}\n\n确定要继续吗？",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        errors = []
+        files_to_delete = associated if associated else [actual_path]
+        for f in files_to_delete:
+            try:
+                if os.path.exists(f):
+                    os.remove(f)
+            except Exception as e:
+                errors.append(f"{os.path.basename(f)}: {e}")
+
+        # 无论是否有错误，先从工程中移除图层
+        try:
+            QgsProject.instance().removeMapLayer(layer.id())
+        except Exception:
+            pass
+
+        self.refresh()
+
+        if errors:
+            QMessageBox.warning(self, "部分文件删除失败", "以下文件未能删除：\n" + "\n".join(errors))
+
