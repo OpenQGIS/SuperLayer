@@ -1,4 +1,6 @@
 import os
+import sys
+
 
 # Robust fallback imports for Qt
 try:
@@ -480,8 +482,9 @@ class SuperLayerDockWidget(QDialog):
         self.resize(600, 450)
         try:
             self.setWindowFlags(self.windowFlags() | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Failed to set window flags: %s", e)
         
         # Setup UI components directly on dialog
         self.layout = QVBoxLayout(self)
@@ -1069,18 +1072,22 @@ class SuperLayerDockWidget(QDialog):
             
         def on_open():
             try:
+                import subprocess  # noqa: PLC0415
                 norm_path = os.path.normpath(actual_path)
                 if os.name == 'nt':
-                    import subprocess
+                    # Use list args to avoid shell injection (Bandit B602/B603)
                     if os.path.isdir(norm_path):
-                        subprocess.Popen(f'explorer.exe "{norm_path}"')
+                        subprocess.Popen(['explorer.exe', norm_path])  # noqa: S603
                     else:
-                        subprocess.Popen(f'explorer /select,"{norm_path}"')
+                        subprocess.Popen(['explorer', '/select,', norm_path])  # noqa: S603
                 else:
+                    # Use list args; avoid os.startfile which is Windows-only (Bandit B606)
                     if os.path.isdir(norm_path):
-                        os.startfile(norm_path)
+                        opener = 'open' if sys.platform == 'darwin' else 'xdg-open'
+                        subprocess.Popen([opener, norm_path])  # noqa: S603
                     else:
-                        os.startfile(os.path.dirname(norm_path))
+                        opener = 'open' if sys.platform == 'darwin' else 'xdg-open'
+                        subprocess.Popen([opener, os.path.dirname(norm_path)])  # noqa: S603
             except Exception as e:
                 QMessageBox.warning(self, "操作失败", f"打开文件夹失败: {str(e)}")
                 

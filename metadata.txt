@@ -3,7 +3,7 @@ name=SuperLayer
 qgisMinimumVersion=3.0
 qgisMaximumVersion=4.99
 description=使用列表、文件夹树、思维导图、矩形树图或图层属性看板管理工程图层，支持右键菜单移动/复制/备份物理文件、样式管理、删除图层与删除文件等高级操作。
-version=1.5.0
+version=1.5.1
 author=OpenQGIS
 email=OpenQGIS@outlook.com
 about=使用思维导图或矩形树图查看 QGIS 图层，支持多选批量更新数据源/CRS/编码/可见比例尺；右键菜单提供移动、复制、备份物理文件（可选是否从新路径加载）；样式管理支持保存与清除默认样式；并可直接删除图层或永久删除物理文件（含确认保护）。
@@ -14,6 +14,8 @@ homepage=https://github.com/OpenQGIS/SuperLayer
 category=Plugins
 icon=icons/SuperLayer.png
 changelog=
+    Version 1.5.1:
+    * 🔒 安全加固：subprocess.Popen 调用改为列表参数形式，消除命令注入风险（Bandit B602/B603）；非 Windows 平台文件夹打开改用跨平台 subprocess 替代 os.startfile（Bandit B606）；修复 bare except pass 静默吞掉异常的问题（Bandit BLE001）。/ Security hardening: replaced f-string subprocess calls with list args to eliminate injection risk; replaced os.startfile with cross-platform subprocess on non-Windows; replaced bare except pass with proper logging.
     Version 1.5.0:
     * 🗂️ 右键菜单全面重构：拆分为「移动」「复制」「备份」三个独立文件操作动作，分别通过鼠标悬停提示明示加载路径差异（从新路径/从原始路径加载）。/ Refactored context menu: separated Move, Copy, and Backup file actions with distinct hover tooltips indicating load path behavior.
     * 🎨 新增「样式管理」子菜单：支持「保存为默认样式」（调用 QGIS 官方 API）与「清除默认样式」（删除磁盘 .qml 文件并重置渲染器）。/ Added Style Management submenu with Save/Clear default style actions using QGIS native API and on-disk .qml management.
