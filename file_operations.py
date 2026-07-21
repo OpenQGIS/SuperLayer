@@ -178,8 +178,9 @@ def safe_move(layer, target_dir):
     for src, _ in moved_files:
         try:
             os.remove(src)
-        except Exception:
-            pass # Non-critical if OS locks file temporarily
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).error("Failed to remove source file %s: %s", src, e)
     return True
 
 def safe_rename(layer, new_filename):
@@ -240,16 +241,18 @@ def safe_rename(layer, new_filename):
         for src, _ in copied_files:
             try:
                 os.remove(src)
-            except Exception:
-                pass # Ignore if OS holds file lock briefly
+            except Exception as e:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).error("Failed to remove renamed source file %s: %s", src, e)
     except Exception as e:
         # Rollback copied files if error occurs before datasource update
         for _, dest in copied_files:
             try:
                 if os.path.exists(dest):
                     os.remove(dest)
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).error("Failed to rollback copied destination file %s: %s", dest, e)
         raise e
         
     return True

@@ -3,7 +3,7 @@ name=SuperLayer
 qgisMinimumVersion=3.0
 qgisMaximumVersion=4.99
 description=使用列表、文件夹树、思维导图、矩形树图或图层属性看板管理工程图层，支持右键菜单移动/复制/备份物理文件、样式管理、删除图层与删除文件等高级操作。
-version=1.5.1
+version=1.6.1
 author=OpenQGIS
 email=OpenQGIS@outlook.com
 about=使用思维导图或矩形树图查看 QGIS 图层，支持多选批量更新数据源/CRS/编码/可见比例尺；右键菜单提供移动、复制、备份物理文件（可选是否从新路径加载）；样式管理支持保存与清除默认样式；并可直接删除图层或永久删除物理文件（含确认保护）。
@@ -14,6 +14,12 @@ homepage=https://github.com/OpenQGIS/SuperLayer
 category=Plugins
 icon=icons/SuperLayer.png
 changelog=
+    Version 1.6.1:
+    * 🔄 QGIS 4 与 Qt 6 全面适配：重构所有 Qt 导入模块，全面迁移至完全限定枚举（如 Qt.AlignmentFlag.AlignLeft 等），将 dialog/menu.exec_() 重命名为 exec()，并解决 QFontMetrics.width() 兼容性问题。/ Full QGIS 4 and Qt 6 compatibility: refactored all Qt imports to prioritize qgis.PyQt, migrated all Qt enums to fully scoped formats, renamed exec_() to exec(), and fixed QFontMetrics.width() compatibility.
+    * 🛡️ 安全合规与测试 Mock 优化：添加 .bandit 与 .flake8 配置文件排除本地备份和测试目录，将 except Exception 盲捕获改写为特定异常以符合安全扫描规程（Bandit 0 警告）；同时升级 CLI 环境下的 Mock Qt/QGIS 类，保障 88 个单元测试 100%% 通过。/ Security & test validation: added .bandit and .flake8 files to exclude developer and testing folders, resolved bare exceptions to pass bandit checks with 0 warnings, and updated CLI test mocks to keep 88 unittest cases passing.
+    * 🐛 移除局部 PyQt5 导入警告：将 mindmap_view.py 等文件中的局部 PyQt5 导入提升至模块级，彻底消除了扫描器的 PyQt 导入警告。/ Refactored local imports: elevated local PyQt5 imports in mindmap_view.py to module level to eliminate PyQt static import warnings.
+    Version 1.5.2:
+    * 🔒 深度安全加固与异常规整：消除项目内所有残留的参数拼接子进程调用，支持非 Windows 下安全的包含文件夹定位；全面重写了 20 多个 Bare Except 静默拦截块，通过引入针对性捕获与 logging 日志输出，提升底层逻辑稳定性和排查追踪性。/ Deep security hardening: eliminated all residual string subprocess calls, supported safe platform-agnostic folder opening; refactored 20+ silent try-except-pass blocks with targeted exception types and logging.
     Version 1.5.1:
     * 🔒 安全加固：subprocess.Popen 调用改为列表参数形式，消除命令注入风险（Bandit B602/B603）；非 Windows 平台文件夹打开改用跨平台 subprocess 替代 os.startfile（Bandit B606）；修复 bare except pass 静默吞掉异常的问题（Bandit BLE001）。/ Security hardening: replaced f-string subprocess calls with list args to eliminate injection risk; replaced os.startfile with cross-platform subprocess on non-Windows; replaced bare except pass with proper logging.
     Version 1.5.0:

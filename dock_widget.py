@@ -4,8 +4,8 @@ import sys
 
 # Robust fallback imports for Qt
 try:
-    from PyQt5.QtCore import Qt, QModelIndex
-    from PyQt5.QtWidgets import (QAction, QToolBar, QStackedWidget, QListView, 
+    from qgis.PyQt.QtCore import Qt, QModelIndex
+    from qgis.PyQt.QtWidgets import (QAction, QToolBar, QStackedWidget, QListView, 
                                  QTreeView, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QMenu, QFileDialog, QInputDialog,
                                  QAbstractItemView, QMessageBox, QActionGroup, QHeaderView, QSizePolicy, QDialog)
 except ImportError:
@@ -37,12 +37,29 @@ except ImportError:
                     Horizontal = 1
                     AlignLeft = 1
                     ToolButtonTextBesideIcon = 2
+                    class AlignmentFlag:
+                        AlignLeft = 1
+                    class ToolButtonStyle:
+                        ToolButtonTextBesideIcon = 2
+                    class ContextMenuPolicy:
+                        CustomContextMenu = 3
+                    class ItemDataRole:
+                        UserRole = 32
+                    class WindowType:
+                        WindowMinimizeButtonHint = 1
+                        WindowMaximizeButtonHint = 2
                 class QHeaderView:
                     Interactive = 0
                     ResizeToContents = 1
+                    class ResizeMode:
+                        Interactive = 0
+                        ResizeToContents = 1
                 class QSizePolicy:
                     Fixed = 0
                     Preferred = 1
+                    class Policy:
+                        Fixed = 0
+                        Preferred = 1
                 class QModelIndex:
                     pass
                 class QAction:
@@ -260,7 +277,7 @@ except ImportError:
                         return QMenu(self)
                     def addSeparator(self):
                         pass
-                    def exec_(self, pos):
+                    def exec(self, pos):
                         pass
                     def setIcon(self, icon):
                         self._icon = icon
@@ -279,12 +296,19 @@ except ImportError:
                     NoEditTriggers = 0
                     ExtendedSelection = 3
                     SelectRows = 1
+                    class SelectionMode:
+                        ExtendedSelection = 3
+                    class SelectionBehavior:
+                        SelectRows = 1
                 class QMessageBox:
                     Yes = 16384
                     No = 65536
+                    class StandardButton:
+                        Yes = 16384
+                        No = 65536
                     @classmethod
-                    def warning(cls, parent, title, text):
-                        pass
+                    def warning(cls, parent, title, text, buttons=None, default_button=None):
+                        return 16384
                     @classmethod
                     def information(cls, parent, title, text):
                         pass
@@ -297,7 +321,7 @@ except ImportError:
 
 # Robust fallback imports for QStandardItemModel & QStandardItem
 try:
-    from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon
+    from qgis.PyQt.QtGui import QStandardItemModel, QStandardItem, QIcon
 except ImportError:
     try:
         from qtpy.QtGui import QStandardItemModel, QStandardItem, QIcon
@@ -452,7 +476,7 @@ except ImportError:
 
 
 try:
-    from PyQt5.QtCore import QSize
+    from qgis.PyQt.QtCore import QSize
 except ImportError:
     try:
         from qtpy.QtCore import QSize
@@ -481,7 +505,7 @@ class SuperLayerDockWidget(QDialog):
         # Configure window properties
         self.resize(600, 450)
         try:
-            self.setWindowFlags(self.windowFlags() | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint)
+            self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMinimizeButtonHint | Qt.WindowType.WindowMaximizeButtonHint)
         except Exception as e:  # noqa: BLE001
             import logging
             logging.getLogger(__name__).warning("Failed to set window flags: %s", e)
@@ -493,7 +517,7 @@ class SuperLayerDockWidget(QDialog):
         
         # Toolbar
         self.toolbar = QToolBar()
-        self.toolbar.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.toolbar.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.layout.addWidget(self.toolbar)
         
         # Tag Filter Row container
@@ -502,7 +526,7 @@ class SuperLayerDockWidget(QDialog):
         self.filter_layout = QHBoxLayout(self.filter_container)
         self.filter_layout.setContentsMargins(10, 4, 10, 4)
         self.filter_layout.setSpacing(6)
-        self.filter_layout.setAlignment(Qt.AlignLeft)
+        self.filter_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         
         # Tag Filter Label indicator
         self.filter_label = QLabel("格式过滤:")
@@ -522,15 +546,15 @@ class SuperLayerDockWidget(QDialog):
         
         self.physical_tree_view = QTreeView()
         self.physical_tree_view.setObjectName("physicalTreeView")
-        self.physical_tree_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.physical_tree_view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.physical_tree_view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.physical_tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.physical_tree_view.setAllColumnsShowFocus(True)
         self.physical_tree_view.setAlternatingRowColors(True)
         
         self.group_tree_view = QTreeView()
         self.group_tree_view.setObjectName("groupTreeView")
-        self.group_tree_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.group_tree_view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.group_tree_view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.group_tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.group_tree_view.setAllColumnsShowFocus(True)
         self.group_tree_view.setAlternatingRowColors(True)
         
@@ -630,7 +654,7 @@ class SuperLayerDockWidget(QDialog):
 
     def _setup_toolbar(self):
         if hasattr(self.toolbar, 'setToolButtonStyle') and hasattr(Qt, 'ToolButtonTextBesideIcon'):
-            self.toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+            self.toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
             
         if hasattr(self.toolbar, 'setIconSize'):
             self.toolbar.setIconSize(QSize(16, 16))
@@ -686,10 +710,10 @@ class SuperLayerDockWidget(QDialog):
 
     def _setup_connections(self):
         # Right click menu context
-        self.physical_tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.physical_tree_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.physical_tree_view.customContextMenuRequested.connect(self.show_physical_tree_context_menu)
         
-        self.group_tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.group_tree_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.group_tree_view.customContextMenuRequested.connect(self.show_group_tree_context_menu)
         
         self.treemap_view.contextMenuTriggered.connect(self.show_treemap_context_menu)
@@ -857,9 +881,9 @@ class SuperLayerDockWidget(QDialog):
             view.setColumnWidth(2, 250)
             hdr = view.header()
             if hdr and hdr.count() > 2:
-                hdr.setSectionResizeMode(0, QHeaderView.Interactive)
-                hdr.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-                hdr.setSectionResizeMode(2, QHeaderView.Interactive)
+                hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+                hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+                hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
 
     def refresh(self):
         self._is_refreshing = True
@@ -880,7 +904,7 @@ class SuperLayerDockWidget(QDialog):
             model = self.physical_model
             for row in range(model.rowCount()):
                 item = model.item(row, 0)
-                if item and item.data(Qt.UserRole) == "separator":
+                if item and item.data(Qt.ItemDataRole.UserRole) == "separator":
                     self.physical_tree_view.setFirstColumnSpanned(row, QModelIndex(), True)
                     break
             
@@ -950,14 +974,14 @@ class SuperLayerDockWidget(QDialog):
         elif isinstance(item, FolderItem):
             # If it's a QGIS virtual group, rename the QGIS group node
             if not item.is_physical:
-                old_name = item.data(Qt.UserRole)
+                old_name = item.data(Qt.ItemDataRole.UserRole)
                 if old_name and old_name != new_name:
                     root = QgsProject.instance().layerTreeRoot()
                     if root:
                         group_node = root.findGroup(old_name)
                         if group_node:
                             group_node.setName(new_name)
-                            item.setData(new_name, Qt.UserRole)
+                            item.setData(new_name, Qt.ItemDataRole.UserRole)
                             self.refresh()
 
     def focus_layer_by_id(self, layer_id):
@@ -1075,25 +1099,25 @@ class SuperLayerDockWidget(QDialog):
                 import subprocess  # noqa: PLC0415
                 norm_path = os.path.normpath(actual_path)
                 if os.name == 'nt':
-                    # Use list args to avoid shell injection (Bandit B602/B603)
+                    explorer_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'explorer.exe')
                     if os.path.isdir(norm_path):
-                        subprocess.Popen(['explorer.exe', norm_path])  # noqa: S603
+                        subprocess.Popen([explorer_path, norm_path])  # nosec B603 B607
                     else:
-                        subprocess.Popen(['explorer', '/select,', norm_path])  # noqa: S603
+                        subprocess.Popen([explorer_path, '/select,', norm_path])  # nosec B603 B607
                 else:
-                    # Use list args; avoid os.startfile which is Windows-only (Bandit B606)
+                    import shutil  # noqa: PLC0415
+                    opener_cmd = 'open' if sys.platform == 'darwin' else 'xdg-open'
+                    opener = shutil.which(opener_cmd) or ('/usr/bin/open' if sys.platform == 'darwin' else '/usr/bin/xdg-open')
                     if os.path.isdir(norm_path):
-                        opener = 'open' if sys.platform == 'darwin' else 'xdg-open'
-                        subprocess.Popen([opener, norm_path])  # noqa: S603
+                        subprocess.Popen([opener, norm_path])  # nosec B603 B607
                     else:
-                        opener = 'open' if sys.platform == 'darwin' else 'xdg-open'
-                        subprocess.Popen([opener, os.path.dirname(norm_path)])  # noqa: S603
+                        subprocess.Popen([opener, os.path.dirname(norm_path)])  # nosec B603 B607
             except Exception as e:
                 QMessageBox.warning(self, "操作失败", f"打开文件夹失败: {str(e)}")
                 
         def on_copy():
             try:
-                from PyQt5.QtWidgets import QApplication
+                from qgis.PyQt.QtWidgets import QApplication
                 norm_path = os.path.normpath(actual_path)
                 QApplication.clipboard().setText(norm_path)
             except Exception as e:
@@ -1101,7 +1125,7 @@ class SuperLayerDockWidget(QDialog):
                 
         act_open_folder.triggered.connect(on_open)
         act_copy_link.triggered.connect(on_copy)
-        menu.exec_(global_pos)
+        menu.exec(global_pos)
 
     def handle_layer_relocation(self, layer_id, target_folder_path):
         try:
@@ -1155,8 +1179,9 @@ class SuperLayerDockWidget(QDialog):
         try:
             total_size = sum(os.path.getsize(f) for f in files if os.path.exists(f))
             file_size_text = f" (总大小: {format_size(total_size)})"
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).debug("Failed to calculate total size: %s", e)
             
         confirm_msg = (
             f"确定要物理移动图层【{layer_name}】的文件吗？\n\n"
@@ -1170,11 +1195,11 @@ class SuperLayerDockWidget(QDialog):
             self, 
             "确认物理移动文件", 
             confirm_msg, 
-            QMessageBox.Yes | QMessageBox.No, 
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, 
+            QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             try:
                 success = safe_move(layer, target_folder_path)
                 if success:
@@ -1314,7 +1339,7 @@ class SuperLayerDockWidget(QDialog):
             act_backup.setToolTip("从原始路径加载文件")
             set_icon(act_backup, "Copy_to_new_folder.svg")
 
-        menu.exec_(global_pos)
+        menu.exec(global_pos)
 
     # Context Actions implementation
     def action_change_datasource(self, layer):
@@ -1336,12 +1361,17 @@ class SuperLayerDockWidget(QDialog):
             try:
                 norm_path = os.path.normpath(actual_path)
                 if os.name == 'nt':
-                    import subprocess
-                    subprocess.Popen(f'explorer /select,"{norm_path}"')
+                    import subprocess  # noqa: PLC0415
+                    explorer_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'explorer.exe')
+                    subprocess.Popen([explorer_path, '/select,', norm_path])  # nosec B603 B607
                 else:
                     dir_path = os.path.dirname(norm_path)
                     if os.path.isdir(dir_path):
-                        os.startfile(dir_path)
+                        import shutil  # noqa: PLC0415
+                        import subprocess  # noqa: PLC0415
+                        opener_cmd = 'open' if sys.platform == 'darwin' else 'xdg-open'
+                        opener = shutil.which(opener_cmd) or ('/usr/bin/open' if sys.platform == 'darwin' else '/usr/bin/xdg-open')
+                        subprocess.Popen([opener, dir_path])  # nosec B603 B607
             except Exception as e:
                 QMessageBox.warning(self, "操作失败", f"打开数据所在的文件夹失败: {str(e)}")
         else:
@@ -1439,8 +1469,9 @@ class SuperLayerDockWidget(QDialog):
                 default_renderer = QgsFeatureRenderer.defaultRenderer(layer.geometryType())
                 layer.setRenderer(default_renderer)
             layer.triggerRepaint()
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Failed to reset styleManager: %s", e)
             
         if deleted_file:
             QMessageBox.information(self, "操作成功", f"默认样式文件已成功清除并重置图层样式。")
@@ -1537,10 +1568,10 @@ class SuperLayerDockWidget(QDialog):
             self,
             "确认删除文件",
             f"此操作将永久删除以下物理文件，且无法恢复：\n\n{file_list}\n\n确定要继续吗？",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
 
         errors = []
@@ -1555,8 +1586,9 @@ class SuperLayerDockWidget(QDialog):
         # 无论是否有错误，先从工程中移除图层
         try:
             QgsProject.instance().removeMapLayer(layer.id())
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Failed to remove layer from project: %s", e)
 
         self.refresh()
 

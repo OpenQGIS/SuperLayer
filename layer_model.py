@@ -1,8 +1,8 @@
 import os
 
 try:
-    from PyQt5.QtCore import Qt, QSize
-    from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QPainter
+    from qgis.PyQt.QtCore import Qt, QSize
+    from qgis.PyQt.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QPainter
 except ImportError:
     try:
         from qtpy.QtCore import Qt, QSize
@@ -20,6 +20,11 @@ except ImportError:
                 class Qt:
                     UserRole = 32
                     ItemIsEditable = 2
+                    class ItemDataRole:
+                        UserRole = 32
+                    class ItemFlag:
+                        NoItemFlags = 0
+                        ItemIsEditable = 2
                 class QSize:
                     def __init__(self, w, h):
                         pass
@@ -287,9 +292,9 @@ class LayerItem(QStandardItem):
         super().__init__(display_name)
         self.layer = layer
         if layer:
-            self.setData(layer.id(), Qt.UserRole)
+            self.setData(layer.id(), Qt.ItemDataRole.UserRole)
         else:
-            self.setData("", Qt.UserRole)
+            self.setData("", Qt.ItemDataRole.UserRole)
             
         # Load and set custom icon
         self.setIcon(_get_layer_icon(layer))
@@ -357,7 +362,7 @@ def _get_folder_icon(is_physical, path=""):
     # Fallback to system standard folder icon
     try:
         try:
-            from PyQt5.QtWidgets import QApplication, QStyle
+            from qgis.PyQt.QtWidgets import QApplication, QStyle
         except ImportError:
             try:
                 from qtpy.QtWidgets import QApplication, QStyle
@@ -372,9 +377,10 @@ def _get_folder_icon(is_physical, path=""):
         
         style = QApplication.style()
         if style:
-            return style.standardIcon(QStyle.SP_DirIcon)
-    except Exception:
-        pass
+            return style.standardIcon(QStyle.StandardPixmap.SP_DirIcon)
+    except Exception as e:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).debug("Failed to retrieve system standard folder icon: %s", e)
         
     return QIcon()
 
@@ -385,7 +391,7 @@ class FolderItem(QStandardItem):
         super().__init__(os.path.basename(folder_path) if folder_path else "根目录")
         self.folder_path = folder_path
         self.is_physical = is_physical
-        self.setData(folder_path, Qt.UserRole)
+        self.setData(folder_path, Qt.ItemDataRole.UserRole)
         
         # Load custom/system icon
         self.setIcon(_get_folder_icon(is_physical, folder_path))
@@ -419,8 +425,9 @@ def get_layer_format(layer):
                     return "临时图层"
                 if provider_name in ['wms', 'wfs', 'wcs', 'arcgismapserver', 'arcgisfeatureserver', 'tilexyz', 'vectortile']:
                     return "在线图层"
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).debug("Failed to read layer provider name: %s", e)
         
     source = layer.source()
     if not isinstance(source, str) or not source:
@@ -504,8 +511,9 @@ class LayerTreeModel(QStandardItemModel):
             provider_type = ""
             try:
                 provider_type = layer.providerType()
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).debug("Failed to read layer providerType: %s", e)
                 
             is_online = False
             format_name = get_layer_format(layer)
@@ -587,13 +595,13 @@ class LayerTreeModel(QStandardItemModel):
                 parent_folder_item = FolderItem(parent_dir, is_physical=is_phys)
                 parent_folder_item.setText(display_name)
                 parent_folder_item.setToolTip(parent_dir if parent_dir else "根目录")
-                parent_folder_item.setFlags(parent_folder_item.flags() & ~Qt.ItemIsEditable)
+                parent_folder_item.setFlags(parent_folder_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 
                 size_item_parent = QStandardItem("")
-                size_item_parent.setFlags(size_item_parent.flags() & ~Qt.ItemIsEditable)
+                size_item_parent.setFlags(size_item_parent.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 
                 path_item_parent = QStandardItem("")
-                path_item_parent.setFlags(path_item_parent.flags() & ~Qt.ItemIsEditable)
+                path_item_parent.setFlags(path_item_parent.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 
                 parent_dir_items[parent_dir] = [parent_folder_item, size_item_parent, path_item_parent, 0]
                 
@@ -606,13 +614,13 @@ class LayerTreeModel(QStandardItemModel):
                     container_folder_item = FolderItem(container_path, is_physical=True)
                     container_folder_item.setText(os.path.basename(container_path))
                     container_folder_item.setToolTip(container_path)
-                    container_folder_item.setFlags(container_folder_item.flags() & ~Qt.ItemIsEditable)
+                    container_folder_item.setFlags(container_folder_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     
                     size_item_container = QStandardItem("")
-                    size_item_container.setFlags(size_item_container.flags() & ~Qt.ItemIsEditable)
+                    size_item_container.setFlags(size_item_container.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     
                     path_item_container = QStandardItem("")
-                    path_item_container.setFlags(path_item_container.flags() & ~Qt.ItemIsEditable)
+                    path_item_container.setFlags(path_item_container.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     
                     parent_folder_item.appendRow([container_folder_item, size_item_container, path_item_container])
                     container_items[container_path] = [container_folder_item, size_item_container, 0]
@@ -625,11 +633,11 @@ class LayerTreeModel(QStandardItemModel):
             # c. Create and append the LayerItem
             name_item = LayerItem(layer, layer.name())
             size_item = QStandardItem(format_size(size))
-            size_item.setData(size, Qt.UserRole)
-            size_item.setFlags(size_item.flags() & ~Qt.ItemIsEditable)
+            size_item.setData(size, Qt.ItemDataRole.UserRole)
+            size_item.setFlags(size_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             
             path_item = QStandardItem(phys_path if phys_path else "")
-            path_item.setFlags(path_item.flags() & ~Qt.ItemIsEditable)
+            path_item.setFlags(path_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             
             target_folder_item.appendRow([name_item, size_item, path_item])
             
@@ -637,15 +645,15 @@ class LayerTreeModel(QStandardItemModel):
         for parent_dir, (parent_folder_item, size_item_parent, path_item_parent, total_size) in parent_dir_items.items():
             if parent_dir in ["虚拟图层", "临时图层", "不可用图层", "在线图层"]:
                 size_item_parent.setText("")
-                size_item_parent.setData(0, Qt.UserRole)
+                size_item_parent.setData(0, Qt.ItemDataRole.UserRole)
             else:
                 size_item_parent.setText(format_size(total_size))
-                size_item_parent.setData(total_size, Qt.UserRole)
+                size_item_parent.setData(total_size, Qt.ItemDataRole.UserRole)
             
         # Update container total size labels
         for container_path, (container_folder_item, size_item_container, total_size) in container_items.items():
             size_item_container.setText(format_size(total_size))
-            size_item_container.setData(total_size, Qt.UserRole)
+            size_item_container.setData(total_size, Qt.ItemDataRole.UserRole)
 
         # Sort and append folders to the model root
         normal_dirs = []
@@ -669,12 +677,12 @@ class LayerTreeModel(QStandardItemModel):
         has_specials = any(name in special_dirs for name in special_names)
         if normal_dirs and has_specials:
             sep_item = QStandardItem("────────────────────────────────────────────────────────────────────────────────────────────────────")
-            sep_item.setFlags(Qt.NoItemFlags)
-            sep_item.setData("separator", Qt.UserRole)
+            sep_item.setFlags(Qt.ItemFlag.NoItemFlags)
+            sep_item.setData("separator", Qt.ItemDataRole.UserRole)
             sep_size = QStandardItem("")
-            sep_size.setFlags(Qt.NoItemFlags)
+            sep_size.setFlags(Qt.ItemFlag.NoItemFlags)
             sep_path = QStandardItem("")
-            sep_path.setFlags(Qt.NoItemFlags)
+            sep_path.setFlags(Qt.ItemFlag.NoItemFlags)
             self.appendRow([sep_item, sep_size, sep_path])
             
         # 3. Append special directories in exact order: 虚拟图层, 临时图层, 不可用图层, 在线图层
@@ -697,9 +705,9 @@ class LayerTreeModel(QStandardItemModel):
             if isinstance(child, QgsLayerTreeGroup):
                 group_item = FolderItem(child.name(), is_physical=False)
                 size_item_group = QStandardItem("")
-                size_item_group.setFlags(size_item_group.flags() & ~Qt.ItemIsEditable)
+                size_item_group.setFlags(size_item_group.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 path_item_group = QStandardItem("")
-                path_item_group.setFlags(path_item_group.flags() & ~Qt.ItemIsEditable)
+                path_item_group.setFlags(path_item_group.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
                 # Traverse recursively first
                 self._traverse_qgis_tree(child, group_item, filter_format)
@@ -713,16 +721,16 @@ class LayerTreeModel(QStandardItemModel):
                     for row_idx in range(group_item.rowCount()):
                         child_size_item = group_item.child(row_idx, 1)
                         if child_size_item:
-                            val = child_size_item.data(Qt.UserRole)
+                            val = child_size_item.data(Qt.ItemDataRole.UserRole)
                             if isinstance(val, (int, float)):
                                 total_group_size += val
 
                     if total_group_size > 0:
                         size_item_group.setText(format_size(total_group_size))
-                        size_item_group.setData(total_group_size, Qt.UserRole)
+                        size_item_group.setData(total_group_size, Qt.ItemDataRole.UserRole)
                     else:
                         size_item_group.setText("N/A")
-                        size_item_group.setData(0, Qt.UserRole)
+                        size_item_group.setData(0, Qt.ItemDataRole.UserRole)
 
             elif isinstance(child, QgsLayerTreeLayer):
                 layer = child.layer()
@@ -743,23 +751,23 @@ class LayerTreeModel(QStandardItemModel):
                     name_item = LayerItem(layer, layer.name())
                     
                     size_item = QStandardItem(format_size(size))
-                    size_item.setData(size, Qt.UserRole)
-                    size_item.setFlags(size_item.flags() & ~Qt.ItemIsEditable)
+                    size_item.setData(size, Qt.ItemDataRole.UserRole)
+                    size_item.setFlags(size_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     
                     path_item = QStandardItem(phys_path if phys_path else "")
-                    path_item.setFlags(path_item.flags() & ~Qt.ItemIsEditable)
+                    path_item.setFlags(path_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     
                     qt_parent_item.appendRow([name_item, size_item, path_item])
                 else:
                     layer_id = child.layerId()
                     name_item = LayerItem(None, child.name())
-                    name_item.setData(layer_id, Qt.UserRole)
+                    name_item.setData(layer_id, Qt.ItemDataRole.UserRole)
                     
                     size_item = QStandardItem("N/A")
-                    size_item.setData(0, Qt.UserRole)
-                    size_item.setFlags(size_item.flags() & ~Qt.ItemIsEditable)
+                    size_item.setData(0, Qt.ItemDataRole.UserRole)
+                    size_item.setFlags(size_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     
                     path_item = QStandardItem("不可用")
-                    path_item.setFlags(path_item.flags() & ~Qt.ItemIsEditable)
+                    path_item.setFlags(path_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     
                     qt_parent_item.appendRow([name_item, size_item, path_item])

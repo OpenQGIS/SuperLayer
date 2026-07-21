@@ -1,10 +1,9 @@
 import os
 
 try:
-    from PyQt5.QtCore import Qt, QPointF, QRectF, QLineF, QObject
-    from PyQt5.QtCore import pyqtSignal as Signal
-    from PyQt5.QtGui import QPainter, QPainterPath, QColor, QFont, QIcon, QPixmap, QPen, QBrush
-    from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsLineItem,
+    from qgis.PyQt.QtCore import Qt, QPointF, QRectF, QLineF, QObject, pyqtSignal as Signal
+    from qgis.PyQt.QtGui import QPainter, QPainterPath, QColor, QFont, QIcon, QPixmap, QPen, QBrush, QCursor
+    from qgis.PyQt.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsLineItem,
                                  QGraphicsObject, QStyleOptionGraphicsItem)
 except ImportError:
     try:
@@ -43,6 +42,31 @@ except ImportError:
                     LeftButton = 1
                     RightButton = 2
                     MiddleButton = 4
+                    class ScrollBarPolicy:
+                        ScrollBarAlwaysOff = 0
+                        ScrollBarAlwaysOn = 1
+                    class AspectRatioMode:
+                        KeepAspectRatio = 1
+                    class PenStyle:
+                        NoPen = 0
+                        SolidLine = 1
+                        DashLine = 2
+                    class AlignmentFlag:
+                        AlignVCenter = 0
+                        AlignLeft = 0
+                        AlignCenter = 0
+                    class TextElideMode:
+                        ElideRight = 0
+                    class MouseButton:
+                        LeftButton = 1
+                        RightButton = 2
+                        MiddleButton = 4
+                    class ClipOperation:
+                        IntersectClip = 1
+                    class CursorShape:
+                        ClosedHandCursor = 1
+                    class TextFlag:
+                        TextWordWrap = 1
                 class QObject:
                     def __init__(self, *args, **kw): pass
                 class Signal:
@@ -70,6 +94,9 @@ except ImportError:
                 class QPainter:
                     Antialiasing = 1
                     SmoothPixmapTransform = 2
+                    class RenderHint:
+                        Antialiasing = 1
+                        SmoothPixmapTransform = 2
                 class QPainterPath:
                     def moveTo(self, *args): pass
                     def cubicTo(self, *args): pass
@@ -91,10 +118,18 @@ except ImportError:
                     def __init__(self, *args): pass
                 class QBrush:
                     def __init__(self, *args): pass
+                class QCursor:
+                    @classmethod
+                    def pos(cls): return QPointF(0.0, 0.0)
                 class QGraphicsItem:
                     ItemSelectedHasChanged = 4
                     ItemIsSelectable = 1
                     ItemIsFocusable = 2
+                    class GraphicsItemChange:
+                        ItemSelectedHasChanged = 4
+                    class GraphicsItemFlag:
+                        ItemIsSelectable = 1
+                        ItemIsFocusable = 2
                     def __init__(self, *args, **kw): pass
                     def setFlags(self, *args): pass
                     def setAcceptHoverEvents(self, val): pass
@@ -124,6 +159,11 @@ except ImportError:
                     NoDrag = 0
                     ScrollHandDrag = 1
                     AnchorUnderMouse = 1
+                    class DragMode:
+                        NoDrag = 0
+                        ScrollHandDrag = 1
+                    class ViewportAnchor:
+                        AnchorUnderMouse = 1
                     def __init__(self, *args, **kw): pass
                     def setScene(self, scene): pass
                     def setDragMode(self, mode): pass
@@ -173,7 +213,7 @@ except ImportError:
             return path
 
 try:
-    from PyQt5.QtSvg import QSvgRenderer
+    from qgis.PyQt.QtSvg import QSvgRenderer
 except ImportError:
     class QSvgRenderer:
         def __init__(self, path=None):
@@ -267,7 +307,7 @@ class MindMapNodeItem(QGraphicsObject):
         self.node = node
         node.item = self
         
-        self.setFlags(QGraphicsItem.ItemIsSelectable | QGraphicsItem.ItemIsFocusable)
+        self.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable | QGraphicsItem.GraphicsItemFlag.ItemIsFocusable)
         self.setAcceptHoverEvents(True)
         self.hovered = False
         self.toggle_hovered = False
@@ -330,7 +370,7 @@ class MindMapNodeItem(QGraphicsObject):
         return QRectF(-2.0, -2.0, self.node.width + extra, self.node.height + 4.0)
 
     def paint(self, painter, option, widget=None):
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # 1. Background round rect
         rect = QRectF(0.0, 0.0, self.node.width, self.node.height)
@@ -365,7 +405,7 @@ class MindMapNodeItem(QGraphicsObject):
         
         if self.svg_renderer:
             painter.save()
-            painter.setClipRect(icon_rect, Qt.IntersectClip)
+            painter.setClipRect(icon_rect, Qt.ClipOperation.IntersectClip)
             self.svg_renderer.render(painter, icon_rect)
             painter.restore()
             has_icon = True
@@ -388,11 +428,11 @@ class MindMapNodeItem(QGraphicsObject):
         # Elide text if too long for node
         font_metrics = painter.fontMetrics()
         available_width = self.node.width - text_start_x - 10
-        elided_name = font_metrics.elidedText(self.node.name, Qt.ElideRight, int(available_width))
+        elided_name = font_metrics.elidedText(self.node.name, Qt.TextElideMode.ElideRight, int(available_width))
         
         # Vertically centered text
         text_rect = QRectF(text_start_x, 0.0, available_width, self.node.height)
-        painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignLeft, elided_name)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elided_name)
         
         # 4. Draw Collapse/Expand indicator for folders with children
         if self.node.children and not self.node.layer:
@@ -402,7 +442,7 @@ class MindMapNodeItem(QGraphicsObject):
             
             # Indicator background
             circle_color = QColor("#0d6efd") if self.toggle_hovered else QColor("#adb5bd")
-            painter.setPen(Qt.NoPen)
+            painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QBrush(circle_color))
             painter.drawEllipse(QPointF(indicator_x, indicator_y), radius, radius)
             
@@ -441,7 +481,7 @@ class MindMapNodeItem(QGraphicsObject):
         super().hoverLeaveEvent(event)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.RightButton:
+        if event.button() == Qt.MouseButton.RightButton:
             if self.node.layer or (self.node.is_physical_folder and self.node.path):
                 self.setSelected(True)
             event.accept()
@@ -455,7 +495,7 @@ class MindMapNodeItem(QGraphicsObject):
             event.accept()
         else:
             super().mousePressEvent(event)
-            if event.button() == Qt.LeftButton and self.node.layer:
+            if event.button() == Qt.MouseButton.LeftButton and self.node.layer:
                 self._drag_start_pos = event.screenPos()
                 self._is_dragging = False
                 event.accept()
@@ -463,16 +503,17 @@ class MindMapNodeItem(QGraphicsObject):
                 self.layerClicked.emit(self.node.layer.id())
 
     def mouseMoveEvent(self, event):
-        if event.buttons() & Qt.LeftButton and self.node.layer and hasattr(self, '_drag_start_pos'):
+        if event.buttons() & Qt.MouseButton.LeftButton and self.node.layer and hasattr(self, '_drag_start_pos'):
             delta = event.screenPos() - self._drag_start_pos
             dist = (delta.x()**2 + delta.y()**2)**0.5
             
             drag_threshold = 8.0
             try:
-                from PyQt5.QtWidgets import QApplication
+                from qgis.PyQt.QtWidgets import QApplication
                 drag_threshold = QApplication.startDragDistance()
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).debug("Failed to get startDragDistance: %s", e)
                 
             if dist >= drag_threshold:
                 if not getattr(self, '_is_dragging', False):
@@ -491,10 +532,10 @@ class MindMapNodeItem(QGraphicsObject):
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.RightButton:
+        if event.button() == Qt.MouseButton.RightButton:
             event.accept()
             return
-        if event.button() == Qt.LeftButton and self.node.layer:
+        if event.button() == Qt.MouseButton.LeftButton and self.node.layer:
             if getattr(self, '_is_dragging', False):
                 self._is_dragging = False
                 view = self.scene().views()[0] if (self.scene() and self.scene().views()) else None
@@ -521,16 +562,6 @@ class MindMapNodeItem(QGraphicsObject):
     def contextMenuEvent(self, event):
         if self.node.layer or (self.node.is_physical_folder and self.node.path):
             self.setSelected(True)
-            try:
-                from PyQt5.QtGui import QCursor
-            except ImportError:
-                try:
-                    from qtpy.QtGui import QCursor
-                except ImportError:
-                    try:
-                        from PySide2.QtGui import QCursor
-                    except ImportError:
-                        from PySide6.QtGui import QCursor
             global_pos = QCursor.pos()
             view = self.scene().views()[0] if (self.scene() and self.scene().views()) else None
             if view and hasattr(view, 'on_node_context_menu'):
@@ -540,7 +571,7 @@ class MindMapNodeItem(QGraphicsObject):
             super().contextMenuEvent(event)
 
     def itemChange(self, change, value):
-        if change == QGraphicsItem.ItemSelectedHasChanged:
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
             if self.scene():
                 self.scene().update()
         return super().itemChange(change, value)
@@ -561,7 +592,7 @@ class MindMapConnectionItem(QGraphicsItem):
         return p_rect.united(c_rect)
 
     def paint(self, painter, option, widget=None):
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # Calculate parent right-middle and child left-middle
         p_rect = self.parent_item.sceneBoundingRect()
@@ -586,7 +617,7 @@ class MindMapConnectionItem(QGraphicsItem):
         pen_color = QColor("#0d6efd") if is_highlighted else QColor("#adb5bd")
         pen_width = 2.0 if is_highlighted else 1.25
         
-        painter.setPen(QPen(pen_color, pen_width, Qt.SolidLine))
+        painter.setPen(QPen(pen_color, pen_width, Qt.PenStyle.SolidLine))
         painter.drawPath(path)
 
 
@@ -603,13 +634,13 @@ class MindMapView(QGraphicsView):
         self.setScene(self.scene_obj)
         
         # Antialiasing & View Settings
-        self.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
-        self.setDragMode(QGraphicsView.NoDrag) # Dragging nodes with left click, panning with middle click
-        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform)
+        self.setDragMode(QGraphicsView.DragMode.NoDrag) # Dragging nodes with left click, panning with middle click
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         
         # Hide scrollbars for cleaner canvas look
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         
         self.root_node = None
         self.selected_layer_id = ""
@@ -651,12 +682,12 @@ class MindMapView(QGraphicsView):
             
         # 1. Determine Node dimensions based on label sizes at each depth
         try:
-            from PyQt5.QtGui import QFont, QFontMetrics
+            from qgis.PyQt.QtGui import QFont, QFontMetrics
             font = QFont("Microsoft YaHei", 9)
             font.setBold(True)
             fm = QFontMetrics(font)
             def get_text_width(text):
-                return fm.width(text)
+                return fm.horizontalAdvance(text) if hasattr(fm, 'horizontalAdvance') else fm.width(text)
         except Exception:
             def get_text_width(text):
                 w = 0.0
@@ -773,8 +804,9 @@ class MindMapView(QGraphicsView):
                         prov_name = layer.dataProvider().name().lower()
                         if prov_name in ['wms', 'wfs', 'wcs', 'vectortile', 'arcgisfeatureserver', 'arcgismapserver']:
                             is_online = True
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: BLE001
+                    import logging
+                    logging.getLogger(__name__).debug("Failed to check providerType for online check: %s", e)
             
             if is_online:
                 continue
@@ -786,8 +818,9 @@ class MindMapView(QGraphicsView):
                     prov_name = layer.dataProvider().name().lower()
                     if prov_name == 'virtual':
                         is_virtual = True
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).debug("Failed to check providerType for virtual check: %s", e)
             
             # Check if it is a memory or temporary layer
             is_memory = False
@@ -800,8 +833,9 @@ class MindMapView(QGraphicsView):
                             prov_name = layer.dataProvider().name().lower()
                             if prov_name == 'memory':
                                 is_memory = True
-                    except Exception:
-                        pass
+                    except Exception as e:  # noqa: BLE001
+                        import logging
+                        logging.getLogger(__name__).debug("Failed to check providerType for memory check: %s", e)
                     
             if is_virtual:
                 # Put virtual layers under a Virtual folder
@@ -927,7 +961,7 @@ class MindMapView(QGraphicsView):
         """Fits the entire mind map hierarchy inside the view viewport."""
         rect = self.scene_obj.itemsBoundingRect()
         if not rect.isEmpty():
-            self.fitInView(rect.adjusted(-20, -20, 20, 20), Qt.KeepAspectRatio)
+            self.fitInView(rect.adjusted(-20, -20, 20, 20), Qt.AspectRatioMode.KeepAspectRatio)
 
     def select_layer_node(self, layer_id):
         """Selects and focuses a layer item visually in the map view."""
@@ -941,10 +975,10 @@ class MindMapView(QGraphicsView):
                     item.setSelected(False)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.MiddleButton:
+        if event.button() == Qt.MouseButton.MiddleButton:
             self._pan_start = event.pos()
             self._panning = True
-            self.setCursor(Qt.ClosedHandCursor)
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
             event.accept()
         else:
             super().mousePressEvent(event)
@@ -960,7 +994,7 @@ class MindMapView(QGraphicsView):
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MiddleButton and getattr(self, '_panning', False):
+        if event.button() == Qt.MouseButton.MiddleButton and getattr(self, '_panning', False):
             self._panning = False
             self.unsetCursor()
             event.accept()
@@ -976,13 +1010,14 @@ class MindMapView(QGraphicsView):
             import sip
             if self._drag_line_item is not None and sip.isdeleted(self._drag_line_item):
                 self._drag_line_item = None
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).debug("Failed to clean drag line item: %s", e)
 
         if not self._drag_line_item:
             try:
-                from PyQt5.QtWidgets import QGraphicsLineItem
-                from PyQt5.QtGui import QPen, QColor
+                from qgis.PyQt.QtWidgets import QGraphicsLineItem
+                from qgis.PyQt.QtGui import QPen, QColor
             except ImportError:
                 class QGraphicsLineItem:
                     def __init__(self, *args): pass
@@ -997,7 +1032,7 @@ class MindMapView(QGraphicsView):
                     def __init__(self, *args): pass
 
             self._drag_line_item = QGraphicsLineItem()
-            pen = QPen(QColor("#0d6efd"), 2.0, Qt.DashLine)
+            pen = QPen(QColor("#0d6efd"), 2.0, Qt.PenStyle.DashLine)
             self._drag_line_item.setPen(pen)
             self._drag_line_item.setZValue(100) # Draw on top
             self.scene_obj.addItem(self._drag_line_item)
@@ -1017,15 +1052,17 @@ class MindMapView(QGraphicsView):
                 if self._drag_target_item:
                     try:
                         self._drag_target_item.set_drag_highlight(False)
-                    except Exception:
-                        pass
+                    except Exception as e:  # noqa: BLE001
+                        import logging
+                        logging.getLogger(__name__).debug("Failed to set drag highlight: %s", e)
             
             self._drag_target_item = target_item
             if target_item:
                 try:
                     target_item.set_drag_highlight(True)
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: BLE001
+                    import logging
+                    logging.getLogger(__name__).debug("Failed to set drag highlight: %s", e)
 
     def end_dragging(self, current_scene_pos):
         if self._drag_line_item:
@@ -1034,8 +1071,9 @@ class MindMapView(QGraphicsView):
         if hasattr(self, '_drag_target_item') and self._drag_target_item:
             try:
                 self._drag_target_item.set_drag_highlight(False)
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).debug("Failed to set drag highlight: %s", e)
             
         source_item = getattr(self, '_drag_source_item', None)
         target_item = getattr(self, '_drag_target_item', None)

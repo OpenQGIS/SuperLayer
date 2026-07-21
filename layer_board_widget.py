@@ -6,9 +6,9 @@ from functools import partial
 
 # Robust Qt Imports fallback
 try:
-    from PyQt5.QtCore import Qt, QCoreApplication, QSettings, QTranslator, QSize
-    from PyQt5.QtGui import QIcon, QTextCursor, QBrush, QColor
-    from PyQt5.QtWidgets import (
+    from qgis.PyQt.QtCore import Qt, QCoreApplication, QSettings, QTranslator, QSize
+    from qgis.PyQt.QtGui import QIcon, QTextCursor, QBrush, QColor
+    from qgis.PyQt.QtWidgets import (
         QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
         QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
         QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView
@@ -52,6 +52,23 @@ except ImportError:
                     Horizontal = 1
                     Vertical = 2
                     WaitCursor = 3
+                    class KeyboardModifier:
+                        AltModifier = 1
+                    class Orientation:
+                        Horizontal = 1
+                        Vertical = 2
+                    class ItemDataRole:
+                        EditRole = 2
+                        UserRole = 32
+                    class CursorShape:
+                        WaitCursor = 3
+                    class GlobalColor:
+                        yellow = 12
+                    class ItemFlag:
+                        ItemIsSelectable = 1
+                        ItemIsEditable = 2
+                        ItemIsEnabled = 4
+                        NoItemFlags = 0
                 class QSize:
                     def __init__(self, w, h): pass
                 class QIcon:
@@ -59,6 +76,10 @@ except ImportError:
                 class QTextCursor:
                     End = 1
                     MoveAnchor = 2
+                    class MoveOperation:
+                        End = 1
+                    class MoveMode:
+                        MoveAnchor = 2
                 class QBrush:
                     def __init__(self, color):
                         self._color = color
@@ -78,6 +99,12 @@ except ImportError:
                     Fixed = 0
                     Minimum = 1
                     Ignored = 13
+                    class Policy:
+                        Expanding = 7
+                        Preferred = 4
+                        Fixed = 0
+                        Minimum = 1
+                        Ignored = 13
                 class QWidget:
                     def __init__(self, parent=None):
                         self.layout = None
@@ -194,7 +221,7 @@ except ImportError:
                     def setFlags(self, f): self._flags = f
                     def setData(self, role, val):
                         self._data[role] = val
-                        if role == 2:  # Qt.EditRole
+                        if role == 2:  # Qt.ItemDataRole.EditRole
                             self._text = str(val)
                         if self._table and hasattr(self._table, 'itemChanged'):
                             self._table.itemChanged.emit(self)
@@ -269,6 +296,12 @@ except ImportError:
                     ExtendedSelection = 3
                     ScrollPerItem = 0
                     ScrollPerPixel = 1
+                    class ScrollMode:
+                        ScrollPerPixel = 1
+                    class SelectionBehavior:
+                        SelectRows = 1
+                    class SelectionMode:
+                        ExtendedSelection = 3
                 class QCoreApplication:
                     @staticmethod
                     def translate(context, message):
@@ -302,6 +335,8 @@ try:
 except ImportError:
     class Qgis:
         Critical = 1
+        class MessageLevel:
+            Critical = 1
     class QgsProject:
         _instance = None
         @classmethod
@@ -316,6 +351,9 @@ except ImportError:
     class QgsMapLayer:
         VectorLayer = 0
         RasterLayer = 1
+        class LayerType:
+            VectorLayer = 0
+            RasterLayer = 1
         def type(self): return 0
         def id(self): return ""
         def name(self): return ""
@@ -349,6 +387,8 @@ except ImportError:
         def isValid(self): return True
     class QgsVectorDataProvider:
         CreateSpatialIndex = 1
+        class Capability:
+            CreateSpatialIndex = 1
     class QgsVectorLayer(QgsMapLayer):
         def isEditable(self): return False
         def isValid(self): return True
@@ -369,10 +409,10 @@ class CustomTableWidget(QTableWidget):
     """Custom QTableWidget that handles Alt + Mouse Wheel to scroll horizontally with a smaller step size."""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
     def wheelEvent(self, event):
-        if event.modifiers() & Qt.AltModifier:
+        if event.modifiers() & Qt.KeyboardModifier.AltModifier:
             delta = event.angleDelta().y() if event.angleDelta().y() != 0 else event.angleDelta().x()
             hbar = self.horizontalScrollBar()
             if hbar:
@@ -452,7 +492,7 @@ class LayerBoardWidget(QWidget):
         self.main_layout.setSpacing(10)
         
         # 2. QSplitter (left-right split)
-        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.main_layout.addWidget(self.splitter)
         
         # 3. Left Panel (Tab widget for vector and raster tables)
@@ -474,8 +514,8 @@ class LayerBoardWidget(QWidget):
         
         self.vector_table = CustomTableWidget()
         self.vector_table.setAlternatingRowColors(True)
-        self.vector_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.vector_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.vector_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.vector_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         vector_layout.addWidget(self.vector_table)
         
         self.vector_buttons_layout = QHBoxLayout()
@@ -497,8 +537,8 @@ class LayerBoardWidget(QWidget):
         
         self.raster_table = CustomTableWidget()
         self.raster_table.setAlternatingRowColors(True)
-        self.raster_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.raster_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.raster_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.raster_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         raster_layout.addWidget(self.raster_table)
         
         self.raster_buttons_layout = QHBoxLayout()
@@ -576,7 +616,7 @@ class LayerBoardWidget(QWidget):
         crs_icon = QIcon(crs_icon_path) if os.path.exists(crs_icon_path) else QIcon()
 
         crs_input_widget = QWidget()
-        crs_input_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        crs_input_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         crs_input_widget.setMinimumWidth(0)
         crs_input_layout = QHBoxLayout(crs_input_widget)
         crs_input_layout.setContentsMargins(0, 0, 0, 0)
@@ -594,11 +634,11 @@ class LayerBoardWidget(QWidget):
 
         self.inEncodingList = QComboBox()
         self.inEncodingList.setMinimumWidth(0)
-        self.inEncodingList.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.inEncodingList.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.populateAvailableEncodingList()
         enc_wrapper = QWidget()
         enc_wrapper.setMinimumWidth(0)
-        enc_wrapper.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        enc_wrapper.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         enc_wrap_layout = QHBoxLayout(enc_wrapper)
         enc_wrap_layout.setContentsMargins(0, 0, 0, 0)
         enc_wrap_layout.addWidget(self.inEncodingList)
@@ -615,14 +655,14 @@ class LayerBoardWidget(QWidget):
         self.inMaxScale = QLineEdit()
         max_scale_wrapper = QWidget()
         max_scale_wrapper.setMinimumWidth(0)
-        max_scale_wrapper.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        max_scale_wrapper.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         max_scale_wrap_layout = QHBoxLayout(max_scale_wrapper)
         max_scale_wrap_layout.setContentsMargins(0, 0, 0, 0)
         max_scale_wrap_layout.addWidget(self.inMaxScale)
         self.inMinScale = QLineEdit()
         min_scale_wrapper = QWidget()
         min_scale_wrapper.setMinimumWidth(0)
-        min_scale_wrapper.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        min_scale_wrapper.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         min_scale_wrap_layout = QHBoxLayout(min_scale_wrapper)
         min_scale_wrap_layout.setContentsMargins(0, 0, 0, 0)
         min_scale_wrap_layout.addWidget(self.inMinScale)
@@ -812,8 +852,9 @@ class LayerBoardWidget(QWidget):
         
         try:
             table.itemChanged.disconnect()
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).debug("Failed to disconnect itemChanged (likely not connected): %s", e)
             
         attributes = self.layersTable['generic']['attributes'] + lt['attributes']
         self.layersAttributes[layerType] = attributes
@@ -843,9 +884,9 @@ class LayerBoardWidget(QWidget):
         for lid, layer in lr.mapLayers().items():
             if get_layer_format(layer) == "在线图层":
                 continue
-            if layerType == 'vector' and layer.type() != QgsMapLayer.VectorLayer:
+            if layerType == 'vector' and layer.type() != QgsMapLayer.LayerType.VectorLayer:
                 continue
-            if layerType == 'raster' and layer.type() != QgsMapLayer.RasterLayer:
+            if layerType == 'raster' and layer.type() != QgsMapLayer.LayerType.RasterLayer:
                 continue
                 
             self.layerBoardChangedData[layerType][lid] = {}
@@ -864,27 +905,25 @@ class LayerBoardWidget(QWidget):
                 is_spatial_disabled = (layerType == 'vector' and not layer.isSpatial() and attr.get('spatial_only'))
                 
                 if is_spatial_disabled:
-                    newItem.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                    newItem.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                     try:
-                        from PyQt5.QtGui import QBrush, QColor
                         newItem.setForeground(QBrush(QColor('#8c96a0')))
-                    except ImportError:
+                    except (AttributeError, NameError):
                         pass
                 elif is_editable:
-                    newItem.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled)
+                    newItem.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsEnabled)
                 else:
-                    newItem.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                    newItem.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                     try:
-                        from PyQt5.QtGui import QBrush, QColor
                         newItem.setForeground(QBrush(QColor('#8c96a0')))
-                    except ImportError:
+                    except (AttributeError, NameError):
                         pass
                     
                 if layerType == 'vector' and not layer.isSpatial() and attr.get('spatial_only'):
                     value = None
                 else:
                     value = self.getLayerProperty(layer, attr['key'])
-                newItem.setData(Qt.EditRole, value)
+                newItem.setData(Qt.ItemDataRole.EditRole, value)
                 lineData.append(value)
                 
                 if attr['key'] == 'name':
@@ -979,19 +1018,19 @@ class LayerBoardWidget(QWidget):
         
         table.clearSelection()
         
-        layerId = table.item(row, 0).data(Qt.EditRole)
+        layerId = table.item(row, 0).data(Qt.ItemDataRole.EditRole)
         lr = QgsProject.instance()
         layer = lr.mapLayer(layerId)
         if not layer:
             return
             
         prop = self.layersAttributes[layerType][col]['key']
-        data = table.item(row, col).data(Qt.EditRole)
+        data = table.item(row, col).data(Qt.ItemDataRole.EditRole)
         
         # Check URI validation
         if prop == 'source|uri' and not self.newDatasourceIsValid(layer, data):
             table.itemChanged.disconnect()
-            item.setData(Qt.EditRole, self.getLayerProperty(layer, 'source|uri'))
+            item.setData(Qt.ItemDataRole.EditRole, self.getLayerProperty(layer, 'source|uri'))
             slot = partial(self.onItemChanged, layerType)
             table.itemChanged.connect(slot)
             return
@@ -999,7 +1038,7 @@ class LayerBoardWidget(QWidget):
         # Check encoding
         if prop == 'encoding' and data not in layer.dataProvider().availableEncodings():
             table.itemChanged.disconnect()
-            item.setData(Qt.EditRole, self.getLayerProperty(layer, 'encoding'))
+            item.setData(Qt.ItemDataRole.EditRole, self.getLayerProperty(layer, 'encoding'))
             slot = partial(self.onItemChanged, layerType)
             table.itemChanged.connect(slot)
             return
@@ -1008,7 +1047,7 @@ class LayerBoardWidget(QWidget):
         if prop == 'shortname':
             table.itemChanged.disconnect()
             newshortname = re.sub('[^A-Za-z0-9\\.-]', '_', data)
-            item.setData(Qt.EditRole, newshortname)
+            item.setData(Qt.ItemDataRole.EditRole, newshortname)
             slot = partial(self.onItemChanged, layerType)
             table.itemChanged.connect(slot)
             data = newshortname
@@ -1019,9 +1058,10 @@ class LayerBoardWidget(QWidget):
         
         # Change cell color
         try:
-            item.setBackground(QBrush(QColor(Qt.yellow)))
-        except Exception:
-            pass
+            item.setBackground(QBrush(QColor(Qt.GlobalColor.yellow)))
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).debug("Failed to set cell background: %s", e)
 
     def splitSource(self, source):
         if "|" in source:
@@ -1042,11 +1082,11 @@ class LayerBoardWidget(QWidget):
         nlayer = QgsVectorLayer(uri, "probe", ds)
         if not nlayer.isValid():
             if hasattr(self.iface, 'messageBar'):
-                self.iface.messageBar().pushMessage("Error", "incorrect source|uri string: " + newDS, level=Qgis.Critical, duration=4)
+                self.iface.messageBar().pushMessage("Error", "incorrect source|uri string: " + newDS, level=Qgis.MessageLevel.Critical, duration=4)
             return False
         if nlayer.geometryType() != layer.geometryType():
             if hasattr(self.iface, 'messageBar'):
-                self.iface.messageBar().pushMessage("Error", "geometry type mismatch: " + newDS, level=Qgis.Critical, duration=4)
+                self.iface.messageBar().pushMessage("Error", "geometry type mismatch: " + newDS, level=Qgis.MessageLevel.Critical, duration=4)
             return False
         return True
 
@@ -1209,11 +1249,12 @@ class LayerBoardWidget(QWidget):
             if init_crs:
                 projSelector.setCrs(init_crs)
                 
-            if projSelector.exec_():
+            if projSelector.exec():
                 crs = projSelector.crs()
                 self.inCrs.setText(crs.authid())
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Failed to execute CRS selection dialog: %s", e)
 
     def applyBatchUpdate(self):
         """Apply all non-empty batch update fields to selected layers."""
@@ -1243,7 +1284,7 @@ class LayerBoardWidget(QWidget):
         for index in lines:
             row = index.row()
             item = table.item(row, col)
-            item.setData(Qt.EditRole, value)
+            item.setData(Qt.ItemDataRole.EditRole, value)
 
     def performActionOnSelectedLayers(self, key):
         layerType = self.getActiveLayerType()
@@ -1258,7 +1299,7 @@ class LayerBoardWidget(QWidget):
         lr = QgsProject.instance()
         for index in lines:
             row = index.row()
-            layerId = table.item(row, 0).data(Qt.EditRole)
+            layerId = table.item(row, 0).data(Qt.ItemDataRole.EditRole)
             layer = lr.mapLayer(layerId)
             if not layer:
                 continue
@@ -1271,9 +1312,9 @@ class LayerBoardWidget(QWidget):
                     if hasattr(layer, 'saveDefaultStyle'):
                         layer.saveDefaultStyle()
                         
-            elif key == 'createSpatialIndex' and layer.type() == QgsMapLayer.VectorLayer:
+            elif key == 'createSpatialIndex' and layer.type() == QgsMapLayer.LayerType.VectorLayer:
                 provider = layer.dataProvider()
-                if hasattr(provider, 'capabilities') and (provider.capabilities() & QgsVectorDataProvider.CreateSpatialIndex):
+                if hasattr(provider, 'capabilities') and (provider.capabilities() & QgsVectorDataProvider.Capability.CreateSpatialIndex):
                     provider.createSpatialIndex()
                     
             elif key == 'removeLayer':
@@ -1322,7 +1363,7 @@ class LayerBoardWidget(QWidget):
             return
             
         row = lines[0].row()
-        layerId = table.item(row, 0).data(Qt.EditRole)
+        layerId = table.item(row, 0).data(Qt.ItemDataRole.EditRole)
         layer = QgsProject.instance().mapLayer(layerId)
         if not layer:
             return
@@ -1408,8 +1449,9 @@ class LayerBoardWidget(QWidget):
                 new_renderer = w.renderer()
                 if new_renderer:
                     layer.setRenderer(new_renderer.clone())
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Failed to clone and set renderer: %s", e)
             
         if hasattr(layer, "setCacheImage"):
             layer.setCacheImage(None)
@@ -1417,8 +1459,9 @@ class LayerBoardWidget(QWidget):
         
         try:
             self.iface.mapCanvas().refresh()
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).debug("Failed to refresh canvas: %s", e)
 
     def clearLog(self):
         self.txtLog.clear()
@@ -1428,7 +1471,7 @@ class LayerBoardWidget(QWidget):
         suffix = '</span>'
         self.txtLog.append('%s %s %s' % (prefix, msg, suffix))
         c = self.txtLog.textCursor()
-        c.movePosition(QTextCursor.End, QTextCursor.MoveAnchor)
+        c.movePosition(QTextCursor.MoveOperation.End, QTextCursor.MoveMode.MoveAnchor)
         self.txtLog.setTextCursor(c)
 
     def exportToCsv(self):
@@ -1440,7 +1483,7 @@ class LayerBoardWidget(QWidget):
         data = self.layerBoardData[layerType]
         
         try:
-            QApplication.setOverrideCursor(Qt.WaitCursor)
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
             with open(path, 'w', newline='', encoding='utf-8') as csvfile:
                 writer = csv.writer(
                     csvfile, delimiter=self.csvDelimiter, quotechar=self.csvQuotechar, quoting=self.csvQuoting

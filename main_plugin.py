@@ -2,9 +2,9 @@ import os
 
 # Robust fallback imports for Qt
 try:
-    from PyQt5.QtCore import Qt
-    from PyQt5.QtWidgets import QAction
-    from PyQt5.QtGui import QIcon
+    from qgis.PyQt.QtCore import Qt
+    from qgis.PyQt.QtWidgets import QAction
+    from qgis.PyQt.QtGui import QIcon
 except ImportError:
     try:
         from qtpy.QtCore import Qt

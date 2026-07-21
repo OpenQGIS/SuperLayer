@@ -2,9 +2,9 @@ import os
 
 # Robust fallback imports for Qt
 try:
-    from PyQt5.QtCore import Qt, QRectF, pyqtSignal as Signal, QPoint
-    from PyQt5.QtWidgets import QWidget, QToolTip
-    from PyQt5.QtGui import QPainter, QColor, QFont, QPen, QBrush, QLinearGradient
+    from qgis.PyQt.QtCore import Qt, QRectF, pyqtSignal as Signal, QPoint
+    from qgis.PyQt.QtWidgets import QWidget, QToolTip
+    from qgis.PyQt.QtGui import QPainter, QColor, QFont, QPen, QBrush, QLinearGradient
 except ImportError:
     try:
         from qtpy.QtCore import Qt, QRectF, Signal, QPoint
@@ -329,10 +329,10 @@ class TreeMapWidget(QWidget):
     def paintEvent(self, event):
         """Draws the treemap nodes using QPainter."""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         if not self.nodes:
-            painter.drawText(self.rect(), Qt.AlignCenter, "当前工程未加载包含有效物理文件的图层。")
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "当前工程未加载包含有效物理文件的图层。")
             return
         
         painter.setFont(self.font)
@@ -363,7 +363,7 @@ class TreeMapWidget(QWidget):
                 size_str = format_size(node.size)
                 # Word wrap for layer name and size
                 text = f"{node.layer.name()}\n{size_str}"
-                painter.drawText(r.adjusted(4.0, 4.0, -4.0, -4.0), Qt.AlignCenter | Qt.TextWordWrap, text)
+                painter.drawText(r.adjusted(4.0, 4.0, -4.0, -4.0), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, text)
 
     def leaveEvent(self, event):
         if self.hovered_node:
@@ -398,12 +398,12 @@ class TreeMapWidget(QWidget):
 
     def mouseDoubleClickEvent(self, event):
         """Emits layerSelected signal on double-click with left button."""
-        if self.hovered_node and event.button() == Qt.LeftButton:
+        if self.hovered_node and event.button() == Qt.MouseButton.LeftButton:
             self.layerSelected.emit(self.hovered_node.layer.id())
 
     def mouseReleaseEvent(self, event):
         """Emits contextMenuTriggered signal on right-click."""
-        if event.button() == Qt.RightButton and self.hovered_node:
+        if event.button() == Qt.MouseButton.RightButton and self.hovered_node:
             try:
                 global_pos = event.globalPos()
             except AttributeError:
