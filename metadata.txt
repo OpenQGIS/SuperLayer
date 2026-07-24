@@ -2,11 +2,11 @@
 name=SuperLayer
 qgisMinimumVersion=3.0
 qgisMaximumVersion=4.99
-description=使用列表、文件夹树、思维导图、矩形树图或图层属性看板管理工程图层，支持右键菜单移动/复制/备份物理文件、样式管理、删除图层与删除文件等高级操作。
-version=1.6.1
+description=使用列表、文件夹树、思维导图、矩形树图或图层属性看板管理工程图层，支持右键菜单移动/复制/备份物理文件、样式管理、删除图层与删除文件等高级操作。/ Manage engineering layers using lists, folder trees, mind maps, rectangular tree diagrams, or layer property dashboards. Advanced operations include moving, copying, or backing up physical files via the right-click menu, style management, and deleting layers or files.
+version=1.7.2
 author=OpenQGIS
 email=OpenQGIS@outlook.com
-about=使用思维导图或矩形树图查看 QGIS 图层，支持多选批量更新数据源/CRS/编码/可见比例尺；右键菜单提供移动、复制、备份物理文件（可选是否从新路径加载）；样式管理支持保存与清除默认样式；并可直接删除图层或永久删除物理文件（含确认保护）。
+about=使用思维导图或矩形树图查看 QGIS 图层，支持多选批量更新数据源/CRS/编码/可见比例尺；右键菜单提供移动、复制、备份物理文件（可选是否从新路径加载）；样式管理支持保存与清除默认样式；并可直接删除图层或永久删除物理文件（含确认保护）。/ View QGIS layers using mind maps or rectangular tree diagrams, supporting batch updates for multiple data sources/CRS/notations/visible scales; the right-click menu provides options to move, copy, or back up physical files (with optional re-loading from new paths); Style management allows saving or clearing default styles; and you can directly delete layers or permanently delete physical files (with protection confirmation).
 tracker=https://github.com/OpenQGIS/SuperLayer/issues
 repository=https://github.com/OpenQGIS/SuperLayer
 tags=layers, properties, table, metadata, report, board, style, mindmap
@@ -14,6 +14,13 @@ homepage=https://github.com/OpenQGIS/SuperLayer
 category=Plugins
 icon=icons/SuperLayer.png
 changelog=
+    Version 1.7.2:
+    * 🔍 新增右键缩放与双击行为重构：新增“缩放到图层”、“缩放到文件夹”、“缩放到图层组”右键选项，并移除双击自动缩放逻辑（改为仅选中激活）。对临时与在线图层自适应结合 QGIS 原生缩放和回退保护。/ Added right-click Zoom to Layer/Folder/Group actions, disabled automatic zoom on double-click, and integrated native QGIS zoom fallback for temporary/online layers.
+    * 🛡️ GeoPackage 内部删除保护：将 GPKG 数据库图层的“删除文件”替换为“删除数据库内图层”，调用 OGR deleteLayer 仅删除库内表，防范误删整个物理数据库。/ Protected GPKG layers by replacing "Delete File" with "Delete Layer inside Database" to drop specific tables via OGR without deleting the entire database file.
+    * 📂 物理文件夹重命名迁移：将“重命名父文件夹名”从图层右键移出，在文件夹和图层组右键节点提供“重命名文件夹”物理更名与路径自动更新支持。/ Moved folder renaming to folder node right-click menus, enabling directory renaming with automatic project layer path updating.
+    * 🌐 多语言支持与本地化适配：新增阿拉伯语、德语、英语、西班牙语、法语、意大利语、日语、韩语、葡萄牙语、俄语及中文等12种语言的完整国际化支持，智能识别 QGIS 区域设置并自适应切换界面语言。/ Added full localization and multi-language support for 12 languages including English, Chinese, Arabic, German, Spanish, French, Italian, Japanese, Korean, Portuguese, and Russian, automatically adapting to QGIS locale settings.
+    Version 1.6.2:
+    * 🔄 添加英文描述。/ Add English description.
     Version 1.6.1:
     * 🔄 QGIS 4 与 Qt 6 全面适配：重构所有 Qt 导入模块，全面迁移至完全限定枚举（如 Qt.AlignmentFlag.AlignLeft 等），将 dialog/menu.exec_() 重命名为 exec()，并解决 QFontMetrics.width() 兼容性问题。/ Full QGIS 4 and Qt 6 compatibility: refactored all Qt imports to prioritize qgis.PyQt, migrated all Qt enums to fully scoped formats, renamed exec_() to exec(), and fixed QFontMetrics.width() compatibility.
     * 🛡️ 安全合规与测试 Mock 优化：添加 .bandit 与 .flake8 配置文件排除本地备份和测试目录，将 except Exception 盲捕获改写为特定异常以符合安全扫描规程（Bandit 0 警告）；同时升级 CLI 环境下的 Mock Qt/QGIS 类，保障 88 个单元测试 100%% 通过。/ Security & test validation: added .bandit and .flake8 files to exclude developer and testing folders, resolved bare exceptions to pass bandit checks with 0 warnings, and updated CLI test mocks to keep 88 unittest cases passing.

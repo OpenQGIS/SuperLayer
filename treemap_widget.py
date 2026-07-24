@@ -162,9 +162,13 @@ except ImportError:
             if not source_path:
                 return "", ""
             parts = source_path.split('|', 1)
-            if len(parts) == 2:
-                return parts[0], '|' + parts[1]
-            return source_path, ""
+            phys_path = parts[0]
+            q_params = '|' + parts[1] if len(parts) == 2 else ""
+            if '?' in phys_path:
+                sub_parts = phys_path.split('?', 1)
+                phys_path = sub_parts[0]
+                q_params = '?' + sub_parts[1] + q_params
+            return phys_path.replace('\\', '/'), q_params
         
         def get_associated_files(file_path):
             phys_path, _ = split_qgis_source(file_path)
@@ -173,13 +177,20 @@ except ImportError:
         def format_size(size_in_bytes):
             """Formats the size in bytes to a human-readable string."""
             if size_in_bytes <= 0:
-                return "N/A"
+                return "-"
             val = float(size_in_bytes)
             for unit in ['B', 'KB', 'MB', 'GB']:
                 if val < 1024.0:
                     return f"{val:.2f} {unit}"
                 val /= 1024.0
             return f"{val:.2f} TB"
+try:
+    from .translation import tr
+except ImportError:
+    try:
+        from translation import tr
+    except ImportError:
+        def tr(text, disambiguation=None): return text
 
 
 class TreeMapNode:
@@ -332,7 +343,7 @@ class TreeMapWidget(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         if not self.nodes:
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "当前工程未加载包含有效物理文件的图层。")
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, tr("当前工程未加载包含有效物理文件的图层。"))
             return
         
         painter.setFont(self.font)
@@ -392,7 +403,7 @@ class TreeMapWidget(QWidget):
                     except AttributeError:
                         global_pos = QPoint(0, 0)
                 size_str = format_size(found.size)
-                QToolTip.showText(global_pos, f"{found.layer.name()}\n大小: {size_str}\n路径: {found.path}", self)
+                QToolTip.showText(global_pos, f"{found.layer.name()}\n" + tr("大小: {}").format(size_str) + "\n" + tr("路径: {}").format(found.path), self)
             else:
                 QToolTip.hideText()
 

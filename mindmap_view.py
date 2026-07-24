@@ -272,6 +272,13 @@ def truncate_middle_path(path_str, max_len=30):
         right = "…" + right[-(half-1):]
         
     return left + separator + "……" + separator + right
+try:
+    from .translation import tr
+except ImportError:
+    try:
+        from translation import tr
+    except ImportError:
+        def tr(text, disambiguation=None): return text
 
 
 class MindMapNode:
@@ -364,6 +371,93 @@ class MindMapNodeItem(QGraphicsObject):
         self.drag_highlight = highlight
         self.update()
 
+    def _get_format_colors(self):
+        layer = self.node.layer
+        if not layer:
+            return {
+                "bg": "#fafafa",
+                "border": "#ced4da",
+                "text": "#495057"
+            }
+            
+        # Determine format
+        fmt = "other"
+        try:
+            from qgis.core import QgsRasterLayer
+            is_raster = isinstance(layer, QgsRasterLayer)
+        except Exception:
+            is_raster = False
+            
+        if is_raster:
+            fmt = "tif"
+        else:
+            source = getattr(layer, 'source', lambda: '')()
+            if not source:
+                provider = getattr(layer, 'providerType', lambda: '')()
+                if provider == "memory":
+                    fmt = "memory"
+            else:
+                try:
+                    from .file_operations import split_qgis_source
+                except ImportError:
+                    try:
+                        from file_operations import split_qgis_source
+                    except ImportError:
+                        def split_qgis_source(s):
+                            if not s:
+                                return "", ""
+                            parts = s.split('|', 1)
+                            phys_path = parts[0]
+                            q_params = '|' + parts[1] if len(parts) == 2 else ""
+                            if '?' in phys_path:
+                                sub_parts = phys_path.split('?', 1)
+                                phys_path = sub_parts[0]
+                                q_params = '?' + sub_parts[1] + q_params
+                            return phys_path.replace('\\', '/'), q_params
+                            
+                phys_path, _ = split_qgis_source(source)
+                if not phys_path:
+                    provider = getattr(layer, 'providerType', lambda: '')()
+                    if provider == "memory":
+                        fmt = "memory"
+                    elif provider in ["wms", "wfs", "wcs", "arcgisfeatureserver", "arcgismapserver", "wms-tile", "xyz-tile"]:
+                        fmt = "online"
+                else:
+                    ext = os.path.splitext(phys_path)[1].lower()
+                    if ext == ".shp":
+                        fmt = "shp"
+                    elif ext in [".tif", ".tiff", ".img", ".asc"]:
+                        fmt = "tif"
+                    elif ext == ".gpkg":
+                        fmt = "gpkg"
+                    elif ext in [".geojson", ".json"]:
+                        fmt = "geojson"
+                    elif ext in [".kml", ".kmz"]:
+                        fmt = "kml"
+                    elif ext in [".csv", ".txt", ".tsv", ".xlsx", ".xls"]:
+                        fmt = "csv"
+                    elif ext in [".dxf", ".dwg"]:
+                        fmt = "dxf"
+                    else:
+                        provider = getattr(layer, 'providerType', lambda: '')()
+                        if provider in ["wms", "wfs", "wcs", "arcgisfeatureserver", "arcgismapserver", "wms-tile", "xyz-tile"]:
+                            fmt = "online"
+                            
+        # Define color mappings
+        colors = {
+            "shp": {"bg": "#e8f5e9", "border": "#a5d6a7", "text": "#1b5e20"},      # Mint Green
+            "tif": {"bg": "#fff3e0", "border": "#ffcc80", "text": "#e65100"},      # Warm Orange
+            "gpkg": {"bg": "#f3e5f5", "border": "#e1bee7", "text": "#4a148c"},     # Soft Lavender
+            "geojson": {"bg": "#fce4ec", "border": "#f8bbd0", "text": "#880e4f"},  # Soft Rose
+            "kml": {"bg": "#e0f7fa", "border": "#b2ebf2", "text": "#006064"},      # Soft Cyan
+            "csv": {"bg": "#efebe9", "border": "#d7ccc8", "text": "#4e342e"},      # Sand/Wood
+            "dxf": {"bg": "#ffebee", "border": "#ffcdd2", "text": "#b71c1c"},      # Terracotta/Red
+            "memory": {"bg": "#eceff1", "border": "#cfd8dc", "text": "#37474f"},   # Slate/Grey
+            "online": {"bg": "#e3f2fd", "border": "#bbdefb", "text": "#0d47a1"},   # Ocean Blue
+            "other": {"bg": "#fafafa", "border": "#e0e0e0", "text": "#424242"}     # Neutral Grey
+        }
+        return colors.get(fmt, colors["other"])
+
     def boundingRect(self):
         # Expand bounding rect slightly to the right to cover the collapse indicator
         extra = 15.0 if (self.node.children and not self.node.layer) else 5.0
@@ -380,11 +474,12 @@ class MindMapNodeItem(QGraphicsObject):
         # Select styles based on states
         is_selected = self.isSelected()
         if self.node.layer:
-            # Layer node styling
-            bg_color = QColor("#e7f1ff") if is_selected else QColor("#ffffff")
-            border_color = QColor("#0d6efd") if (is_selected or self.hovered) else QColor("#dee2e6")
+            # Layer node styling - colored by file format
+            colors = self._get_format_colors()
+            bg_color = QColor(colors["bg"]).darker(108) if is_selected else QColor(colors["bg"])
+            border_color = QColor(colors["text"]) if (is_selected or self.hovered) else QColor(colors["border"])
             border_width = 2.0 if is_selected else (1.5 if self.hovered else 1.0)
-            text_color = QColor("#0d6efd") if is_selected else QColor("#212529")
+            text_color = QColor(colors["text"])
         else:
             # Folder node styling
             is_drag_target = getattr(self, 'drag_highlight', False)
@@ -428,7 +523,7 @@ class MindMapNodeItem(QGraphicsObject):
         # Elide text if too long for node
         font_metrics = painter.fontMetrics()
         available_width = self.node.width - text_start_x - 10
-        elided_name = font_metrics.elidedText(self.node.name, Qt.TextElideMode.ElideRight, int(available_width))
+        elided_name = font_metrics.elidedText(tr(self.node.name), Qt.TextElideMode.ElideRight, int(available_width))
         
         # Vertically centered text
         text_rect = QRectF(text_start_x, 0.0, available_width, self.node.height)
@@ -659,6 +754,13 @@ class MindMapView(QGraphicsView):
         # Save collapse states of current nodes to keep them consistent after refresh
         collapse_states = self._get_current_collapse_states()
         
+        # Save scroll and zoom state if we have a previous tree
+        has_previous_state = (self.root_node is not None)
+        if has_previous_state:
+            transform = self.transform()
+            h_val = self.horizontalScrollBar().value()
+            v_val = self.verticalScrollBar().value()
+            
         self.scene_obj.clear()
         self._drag_line_item = None  # scene.clear() destroys all C++ items; reset the reference
         
@@ -670,8 +772,13 @@ class MindMapView(QGraphicsView):
         # 2. Compute Layout & Draw Tree
         self.rebuild_and_draw()
         
-        # 3. Fit initial view beautifully
-        self.zoom_to_fit()
+        # 3. Fit or restore view
+        if has_previous_state:
+            self.setTransform(transform)
+            self.horizontalScrollBar().setValue(h_val)
+            self.verticalScrollBar().setValue(v_val)
+        else:
+            self.zoom_to_fit()
 
     def rebuild_and_draw(self):
         """Re-calculates the tree layout structure and draws items."""
@@ -701,7 +808,7 @@ class MindMapView(QGraphicsView):
         max_width_by_depth = {}
         def compute_widths(node, depth=0):
             # Dynamic node width to prevent text overflow (icon = 32px + 20px padding)
-            node.width = max(130.0, get_text_width(node.name) + 52.0)
+            node.width = max(130.0, get_text_width(tr(node.name)) + 52.0)
             max_width_by_depth[depth] = max(max_width_by_depth.get(depth, 0.0), node.width)
             if not node.collapsed:
                 for child in node.children:
@@ -782,7 +889,7 @@ class MindMapView(QGraphicsView):
         if project_path:
             project_name = os.path.basename(project_path)
         else:
-            project_name = "未命名工程"
+            project_name = tr("未命名工程")
         root = MindMapNode(project_name)
         
         # Build raw hierarchy

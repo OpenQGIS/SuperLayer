@@ -11,7 +11,7 @@ try:
     from qgis.PyQt.QtWidgets import (
         QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
         QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
-        QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView
+        QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu
     )
 except ImportError:
     try:
@@ -20,7 +20,7 @@ except ImportError:
         from qtpy.QtWidgets import (
             QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
             QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
-            QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView
+            QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu
         )
     except ImportError:
         try:
@@ -29,7 +29,7 @@ except ImportError:
             from PySide2.QtWidgets import (
                 QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
                 QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
-                QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView
+                QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu
             )
         except ImportError:
             try:
@@ -38,7 +38,7 @@ except ImportError:
                 from PySide6.QtWidgets import (
                     QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
                     QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
-                    QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView
+                    QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu
                 )
             except ImportError:
                 # Basic mocks for CLI testing
@@ -302,6 +302,23 @@ except ImportError:
                         SelectRows = 1
                     class SelectionMode:
                         ExtendedSelection = 3
+                class QMenu:
+                    def __init__(self, parent=None):
+                        self._actions = []
+                    def addAction(self, text):
+                        class MockAction:
+                            def __init__(self, text):
+                                self._text = text
+                            def setEnabled(self, e): pass
+                            def setToolTip(self, t): pass
+                        act = MockAction(text)
+                        self._actions.append(act)
+                        return act
+                    def addSeparator(self): pass
+                    def addMenu(self, title):
+                        return QMenu(self)
+                    def exec(self, pos):
+                        return None
                 class QCoreApplication:
                     @staticmethod
                     def translate(context, message):
@@ -426,43 +443,43 @@ class CustomTableWidget(QTableWidget):
 
 class LayerBoardWidget(QWidget):
     """Integrated tabular editor and dashboard for QGIS vector/raster layers."""
-    
     def __init__(self, iface, parent=None):
         super().__init__(parent)
         self.iface = iface
+        self.dock_widget = parent
         
         # Attribute mappings & metadata schema
         self.layersTable = {
             'generic': {
                 'attributes': [
-                    {'key': 'id', 'label': self.tr('Id'), 'editable': False, 'spatial_only': False},
-                    {'key': 'name', 'label': self.tr('Name'), 'editable': True, 'type': 'string', 'spatial_only': False},
-                    {'key': 'crs', 'label': self.tr('CRS'), 'editable': False, 'type': 'crs', 'spatial_only': True},
-                    {'key': 'maxScale', 'label': self.tr('Max scale'), 'editable': True, 'type': 'integer', 'spatial_only': True},
-                    {'key': 'minScale', 'label': self.tr('Min scale'), 'editable': True, 'type': 'integer', 'spatial_only': True},
-                    {'key': 'extent', 'label': self.tr('Extent'), 'editable': False, 'spatial_only': True},
-                    {'key': 'title', 'label': self.tr('Title'), 'editable': True, 'type': 'string', 'spatial_only': False},
-                    {'key': 'abstract', 'label': self.tr('Abstract'), 'editable': True, 'type': 'string', 'spatial_only': False},
-                    {'key': 'shortname', 'label': self.tr('Short name'), 'editable': True, 'type': 'string', 'spatial_only': False},
-                    {'key': 'ghost', 'label': self.tr('Ghost ?'), 'editable': False, 'type': 'string', 'spatial_only': False}
+                    {'key': 'id', 'label': self.tr('编号'), 'editable': False, 'spatial_only': False},
+                    {'key': 'name', 'label': self.tr('图层名'), 'editable': True, 'type': 'string', 'spatial_only': False},
+                    {'key': 'crs', 'label': self.tr('坐标系'), 'editable': False, 'type': 'crs', 'spatial_only': True},
+                    {'key': 'maxScale', 'label': self.tr('最大比例尺'), 'editable': True, 'type': 'integer', 'spatial_only': True},
+                    {'key': 'minScale', 'label': self.tr('最小比例尺'), 'editable': True, 'type': 'integer', 'spatial_only': True},
+                    {'key': 'extent', 'label': self.tr('范围'), 'editable': False, 'spatial_only': True},
+                    {'key': 'title', 'label': self.tr('标题'), 'editable': True, 'type': 'string', 'spatial_only': False},
+                    {'key': 'abstract', 'label': self.tr('摘要'), 'editable': True, 'type': 'string', 'spatial_only': False},
+                    {'key': 'shortname', 'label': self.tr('简称'), 'editable': True, 'type': 'string', 'spatial_only': False},
+                    {'key': 'ghost', 'label': self.tr('幽灵图层'), 'editable': False, 'type': 'string', 'spatial_only': False}
                 ]
             },
             'vector': {
                 'attributes': [
-                    {'key': 'labelsEnabled', 'label': self.tr('Labels on'), 'editable': False, 'spatial_only': True},
-                    {'key': 'featureCount', 'label': self.tr('Features count'), 'editable': False, 'spatial_only': False},
-                    {'key': 'source|uri', 'label': self.tr('Datasource URI'), 'editable': True, 'spatial_only': False},
-                    {'key': 'encoding', 'label': self.tr('Encoding'), 'editable': True, 'spatial_only': False},
-                    {'key': 'styles_in_db', 'label': self.tr('Styles in DB'), 'editable': False, 'type': 'string', 'spatial_only': False},
+                    {'key': 'labelsEnabled', 'label': self.tr('标注已启用'), 'editable': False, 'spatial_only': True},
+                    {'key': 'featureCount', 'label': self.tr('要素数量'), 'editable': False, 'spatial_only': False},
+                    {'key': 'source|uri', 'label': self.tr('数据源路径'), 'editable': True, 'spatial_only': False},
+                    {'key': 'encoding', 'label': self.tr('字符编码'), 'editable': True, 'spatial_only': False},
+                    {'key': 'styles_in_db', 'label': self.tr('数据库样式数'), 'editable': False, 'type': 'string', 'spatial_only': False},
                 ],
             },
             'raster': {
                 'attributes': [
-                    {'key': 'width', 'label': self.tr('Width'), 'editable': False},
-                    {'key': 'height', 'label': self.tr('Height'), 'editable': False},
-                    {'key': 'rasterUnitsPerPixelX', 'label': self.tr('Units per pixel (X)'), 'editable': False},
-                    {'key': 'rasterUnitsPerPixelY', 'label': self.tr('Units per pixel (Y)'), 'editable': False},
-                    {'key': 'uri', 'label': self.tr('URI'), 'editable': False}
+                    {'key': 'width', 'label': self.tr('宽度（像素）'), 'editable': False},
+                    {'key': 'height', 'label': self.tr('高度（像素）'), 'editable': False},
+                    {'key': 'rasterUnitsPerPixelX', 'label': self.tr('X方向分辨率'), 'editable': False},
+                    {'key': 'rasterUnitsPerPixelY', 'label': self.tr('Y方向分辨率'), 'editable': False},
+                    {'key': 'uri', 'label': self.tr('数据路径'), 'editable': False}
                 ],
             }
         }
@@ -519,8 +536,8 @@ class LayerBoardWidget(QWidget):
         vector_layout.addWidget(self.vector_table)
         
         self.vector_buttons_layout = QHBoxLayout()
-        self.btn_commit_vector = QPushButton(self.tr("保存修改 (Commit)"))
-        self.btn_discard_vector = QPushButton(self.tr("放弃修改 (Discard)"))
+        self.btn_commit_vector = QPushButton(self.tr("保存修改"))
+        self.btn_discard_vector = QPushButton(self.tr("放弃修改"))
         self.btn_commit_vector.clicked.connect(lambda: self.commitLayersChanges('vector'))
         self.btn_discard_vector.clicked.connect(lambda: self.discardLayersChanges('vector'))
         self.vector_buttons_layout.addWidget(self.btn_commit_vector)
@@ -542,8 +559,8 @@ class LayerBoardWidget(QWidget):
         raster_layout.addWidget(self.raster_table)
         
         self.raster_buttons_layout = QHBoxLayout()
-        self.btn_commit_raster = QPushButton(self.tr("保存修改 (Commit)"))
-        self.btn_discard_raster = QPushButton(self.tr("放弃修改 (Discard)"))
+        self.btn_commit_raster = QPushButton(self.tr("保存修改"))
+        self.btn_discard_raster = QPushButton(self.tr("放弃修改"))
         self.btn_commit_raster.clicked.connect(lambda: self.commitLayersChanges('raster'))
         self.btn_discard_raster.clicked.connect(lambda: self.discardLayersChanges('raster'))
         self.raster_buttons_layout.addWidget(self.btn_commit_raster)
@@ -560,6 +577,24 @@ class LayerBoardWidget(QWidget):
         self.layersTable['raster']['tableWidget'] = self.raster_table
         self.layersTable['raster']['commitButton'] = self.btn_commit_raster
         self.layersTable['raster']['discardButton'] = self.btn_discard_raster
+        
+        if hasattr(self.vector_table, 'setContextMenuPolicy'):
+            policy = getattr(Qt, 'ContextMenuPolicy', None)
+            custom_policy = getattr(policy, 'CustomContextMenu', None) if policy else None
+            if custom_policy is None:
+                custom_policy = getattr(Qt, 'CustomContextMenu', 3)
+            self.vector_table.setContextMenuPolicy(custom_policy)
+        if hasattr(self.vector_table, 'customContextMenuRequested'):
+            self.vector_table.customContextMenuRequested.connect(lambda pos: self.showTableContextMenu(self.vector_table, pos))
+            
+        if hasattr(self.raster_table, 'setContextMenuPolicy'):
+            policy = getattr(Qt, 'ContextMenuPolicy', None)
+            custom_policy = getattr(policy, 'CustomContextMenu', None) if policy else None
+            if custom_policy is None:
+                custom_policy = getattr(Qt, 'CustomContextMenu', 3)
+            self.raster_table.setContextMenuPolicy(custom_policy)
+        if hasattr(self.raster_table, 'customContextMenuRequested'):
+            self.raster_table.customContextMenuRequested.connect(lambda pos: self.showTableContextMenu(self.raster_table, pos))
         
         self.splitter.addWidget(self.left_container)
         
@@ -595,7 +630,7 @@ class LayerBoardWidget(QWidget):
         actions_layout.setSpacing(8)
         
         # Batch updates (inside group box)
-        group_batch = QGroupBox(self.tr("批量更新 (Batch Update)"))
+        group_batch = QGroupBox(self.tr("批量更新"))
         batch_layout = QVBoxLayout(group_batch)
         batch_layout.setContentsMargins(4, 4, 4, 4)
         grid_layout = QGridLayout()
@@ -606,8 +641,8 @@ class LayerBoardWidget(QWidget):
 
         # Row 0: Labels (plain, no embedded buttons)
         plugin_dir = os.path.dirname(os.path.abspath(__file__))
-        crs_lbl = QLabel(self.tr("设置 CRS:"))
-        self.encodingLabel = QLabel(self.tr("设置编码 (仅矢量):"))
+        crs_lbl = QLabel(self.tr("设置坐标系:"))
+        self.encodingLabel = QLabel(self.tr("设置字符编码（仅矢量）:"))
         grid_layout.addWidget(crs_lbl, 0, 0)
         grid_layout.addWidget(self.encodingLabel, 0, 1)
 
@@ -678,7 +713,7 @@ class LayerBoardWidget(QWidget):
         actions_layout.addWidget(group_batch)
         
         # 2. Actions Group Box
-        group_actions = QGroupBox(self.tr("批量操作 (Actions)"))
+        group_actions = QGroupBox(self.tr("批量操作"))
         act_layout = QVBoxLayout(group_actions)
         act_layout.setSpacing(8)
         
@@ -686,7 +721,7 @@ class LayerBoardWidget(QWidget):
         row4_layout = QHBoxLayout()
         row4_layout.setSpacing(12)
         self.btSaveStyleAsDefault = QPushButton(self.tr("保存样式为默认"))
-        self.btCreateSpatialIndex = QPushButton(self.tr("创建空间索引 (矢量)"))
+        self.btCreateSpatialIndex = QPushButton(self.tr("创建空间索引（仅矢量）"))
         row4_layout.addWidget(self.btSaveStyleAsDefault, 1)
         row4_layout.addWidget(self.btCreateSpatialIndex, 1)
         act_layout.addLayout(row4_layout)
@@ -726,9 +761,9 @@ class LayerBoardWidget(QWidget):
         export_layout.setContentsMargins(8, 8, 8, 8)
         export_layout.setSpacing(10)
         
-        group_export = QGroupBox(self.tr("数据导出 (Export)"))
+        group_export = QGroupBox(self.tr("数据导出"))
         exp_box_layout = QVBoxLayout(group_export)
-        self.btExportCsv = QPushButton(self.tr("导出当前看板为 CSV"))
+        self.btExportCsv = QPushButton(self.tr("导出当前看板为CSV"))
         exp_box_layout.addWidget(self.btExportCsv)
         export_layout.addWidget(group_export)
         export_layout.addStretch(1)
@@ -1095,7 +1130,7 @@ class LayerBoardWidget(QWidget):
         self.updateLog('')
         self.updateLog('###############')
         self.updateLog(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
-        self.updateLog(self.tr('Layer type: ') + layerType)
+        self.updateLog(self.tr('图层类型: ') + layerType)
         self.updateLog('###############')
         
         for layerId, layerData in list(self.layerBoardChangedData[layerType].items()):
@@ -1231,7 +1266,7 @@ class LayerBoardWidget(QWidget):
             
             # Anchor to QGIS main window
             projSelector = QgsProjectionSelectionDialog(self.iface.mainWindow())
-            projSelector.setWindowTitle(self.tr("设置CRS"))
+            projSelector.setWindowTitle(self.tr("设置坐标系"))
             
             init_crs = None
             current_crs_text = self.inCrs.text().strip()
@@ -1432,7 +1467,7 @@ class LayerBoardWidget(QWidget):
 
         if not self.styleWidget:
             # Fallback for mock environments
-            lbl = QLabel(self.tr("图层样式配置 (Headless Mock)"))
+            lbl = QLabel(self.tr("图层样式配置面板"))
             self.styleWidget = lbl
             self.styleScrollArea.setWidget(lbl)
 
@@ -1509,3 +1544,143 @@ class LayerBoardWidget(QWidget):
             cb.addItem("UTF-8")
             cb.addItem("GBK")
             cb.addItem("ISO-8859-1")
+
+    def getSelectedLayers(self, table):
+        sm = table.selectionModel()
+        lines = sm.selectedRows() if hasattr(sm, 'selectedRows') else []
+        if not lines:
+            if hasattr(table, 'currentIndex'):
+                current_index = table.currentIndex()
+                if current_index and hasattr(current_index, 'isValid') and current_index.isValid():
+                    row = current_index.row()
+                    item_0 = table.item(row, 0)
+                    if item_0:
+                        layerId = item_0.data(Qt.ItemDataRole.EditRole)
+                        layer = QgsProject.instance().mapLayer(layerId)
+                        return [layer] if layer else []
+            return []
+            
+        lr = QgsProject.instance()
+        selected_layers = []
+        for index in lines:
+            row = index.row()
+            item_0 = table.item(row, 0)
+            if item_0:
+                layerId = item_0.data(Qt.ItemDataRole.EditRole)
+                layer = lr.mapLayer(layerId)
+                if layer:
+                    selected_layers.append(layer)
+        return selected_layers
+
+    def refreshTables(self):
+        self.populateLayerTable('vector')
+        self.populateLayerTable('raster')
+
+    def showTableContextMenu(self, table, pos):
+        layers = self.getSelectedLayers(table)
+        if not layers:
+            return
+            
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #ffffff;
+                border: 1px solid #dee2e6;
+                padding: 4px 0px;
+                icon-size: 16px;
+            }
+            QMenu::item {
+                margin-left: 3px;
+                padding: 5px 12px 5px 6px;
+                font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+                font-size: 12px;
+                color: #212529;
+            }
+            QMenu::item:selected {
+                background-color: #1484dc;
+                color: #ffffff;
+            }
+        """)
+        
+        plugin_dir = os.path.dirname(os.path.abspath(__file__))
+        icons_dir = os.path.join(plugin_dir, "icons_component")
+        
+        def set_icon(item, svg_name):
+            icon_path = os.path.join(icons_dir, svg_name)
+            if os.path.exists(icon_path):
+                item.setIcon(QIcon(icon_path))
+                
+        num_layers = len(layers)
+        
+        act_change_ds = menu.addAction(self.tr("更换数据源"))
+        act_change_ds.setEnabled(num_layers == 1)
+        set_icon(act_change_ds, "Change_Data_Source.svg")
+        
+        act_open_loc = menu.addAction(self.tr("打开文件位置"))
+        act_open_loc.setEnabled(num_layers == 1)
+        set_icon(act_open_loc, "Open_File_Location.svg")
+        
+        menu.addSeparator()
+        
+        act_move = menu.addAction(self.tr("移动选中的 {} 个文件到…").format(num_layers))
+        act_move.setToolTip(self.tr("从新路径加载文件"))
+        set_icon(act_move, "Move_File.svg")
+        
+        act_copy = menu.addAction(self.tr("复制选中的 {} 个文件到…").format(num_layers))
+        act_copy.setToolTip(self.tr("从新路径加载文件"))
+        set_icon(act_copy, "Copy_to_new_folder.svg")
+        
+        act_backup = menu.addAction(self.tr("备份选中的 {} 个文件到…").format(num_layers))
+        act_backup.setToolTip(self.tr("从原始路径加载文件"))
+        set_icon(act_backup, "Copy_to_new_folder.svg")
+        
+        act_rename = menu.addAction(self.tr("重命名文件"))
+        act_rename.setEnabled(num_layers == 1)
+        set_icon(act_rename, "Renamed_the_original_file.svg")
+        
+        menu.addSeparator()
+        
+        style_menu = menu.addMenu(self.tr("样式管理"))
+        set_icon(style_menu, "Style_Manage.svg")
+        
+        act_clear_style = style_menu.addAction(self.tr("清除默认样式"))
+        act_clear_style.setEnabled(num_layers == 1)
+        set_icon(act_clear_style, "delete_stlye.svg")
+        
+        act_save_style = style_menu.addAction(self.tr("保存为默认样式"))
+        act_save_style.setEnabled(num_layers == 1)
+        set_icon(act_save_style, "Save_stlye.svg")
+        
+        # Execute menu (Qt5/Qt6 compatible: prefer exec, fall back to exec_)
+        exec_pos = table.viewport().mapToGlobal(pos) if hasattr(table, 'viewport') else pos
+        action = getattr(menu, 'exec', getattr(menu, 'exec_', None))(exec_pos)
+        if not action:
+            return
+            
+        dw = self.dock_widget
+        if not dw:
+            return
+            
+        if action == act_change_ds and hasattr(dw, 'action_change_datasource'):
+            dw.action_change_datasource(layers[0])
+            self.refreshTables()
+        elif action == act_open_loc and hasattr(dw, 'action_open_containing_folder'):
+            dw.action_open_containing_folder(layers[0])
+        elif action == act_move and hasattr(dw, 'action_move_files'):
+            dw.action_move_files(layers)
+            self.refreshTables()
+        elif action == act_copy and hasattr(dw, 'action_copy_files'):
+            dw.action_copy_files(layers)
+            self.refreshTables()
+        elif action == act_backup and hasattr(dw, 'action_backup_files'):
+            dw.action_backup_files(layers)
+            self.refreshTables()
+        elif action == act_rename and hasattr(dw, 'action_rename_file'):
+            dw.action_rename_file(layers[0])
+            self.refreshTables()
+        elif action == act_clear_style and hasattr(dw, 'action_clear_default_style'):
+            dw.action_clear_default_style(layers[0])
+            self.refreshTables()
+        elif action == act_save_style and hasattr(dw, 'action_save_as_default_style'):
+            dw.action_save_as_default_style(layers[0])
+            self.refreshTables()

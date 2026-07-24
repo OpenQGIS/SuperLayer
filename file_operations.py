@@ -16,9 +16,15 @@ def split_qgis_source(source_path):
     if not source_path:
         return "", ""
     parts = source_path.split('|', 1)
-    if len(parts) == 2:
-        return parts[0], '|' + parts[1]
-    return source_path, ""
+    phys_path = parts[0]
+    q_params = '|' + parts[1] if len(parts) == 2 else ""
+    
+    if '?' in phys_path:
+        sub_parts = phys_path.split('?', 1)
+        phys_path = sub_parts[0]
+        q_params = '?' + sub_parts[1] + q_params
+        
+    return phys_path.replace('\\', '/'), q_params
 
 def resolve_physical_path(path):
     if not path:
@@ -197,6 +203,8 @@ def safe_rename(layer, new_filename):
     
     # Early exit if rename resolves to same file path (case-insensitive comparison)
     if os.path.normcase(os.path.abspath(phys_source_path)) == os.path.normcase(os.path.abspath(new_phys_source_path)):
+        if hasattr(layer, 'setName'):
+            layer.setName(new_base_name)
         return True
 
     files = get_associated_files(phys_source_path)
@@ -237,13 +245,49 @@ def safe_rename(layer, new_filename):
         new_source_path = new_phys_source_path + query_params
         update_layer_source(layer, new_source_path)
         
-        # Now that datasource is swapped, delete original files
-        for src, _ in copied_files:
+        # Update layer name to match the new file name (without extension)
+        if hasattr(layer, 'setName'):
+            layer.setName(new_base_name)
+        
+        # Process pending Qt events to force destruction of the old data provider (deferred delete)
+        try:
+            from qgis.PyQt.QtCore import QCoreApplication
+            QCoreApplication.processEvents()
+        except ImportError:
             try:
-                os.remove(src)
-            except Exception as e:  # noqa: BLE001
+                from qtpy.QtCore import QCoreApplication
+                QCoreApplication.processEvents()
+            except ImportError:
+                try:
+                    from PySide2.QtCore import QCoreApplication
+                    QCoreApplication.processEvents()
+                except ImportError:
+                    try:
+                        from PySide6.QtCore import QCoreApplication
+                        QCoreApplication.processEvents()
+                    except ImportError:
+                        pass
+
+        # Force garbage collection to release any Python-side wrappers
+        import gc
+        gc.collect()
+        
+        # Now that datasource is swapped, delete original files with a retry loop for Windows locks
+        import time
+        for src, _ in copied_files:
+            deleted = False
+            for attempt in range(20):  # Try for up to 1 second
+                try:
+                    if os.path.exists(src):
+                        os.remove(src)
+                    deleted = True
+                    break
+                except Exception:
+                    gc.collect()
+                    time.sleep(0.05)
+            if not deleted:
                 import logging
-                logging.getLogger(__name__).error("Failed to remove renamed source file %s: %s", src, e)
+                logging.getLogger(__name__).error("Failed to remove renamed source file %s after multiple attempts", src)
     except Exception as e:
         # Rollback copied files if error occurs before datasource update
         for _, dest in copied_files:
@@ -257,10 +301,119 @@ def safe_rename(layer, new_filename):
         
     return True
 
+def safe_rename_dir(source_dir, new_dir_name, additional_layers=None):
+    if not source_dir or not os.path.exists(source_dir):
+        return False
+    source_dir = os.path.abspath(source_dir).replace('\\', '/')
+    
+    parent_dir_parent = os.path.dirname(source_dir)
+    new_source_dir = os.path.join(parent_dir_parent, new_dir_name).replace('\\', '/')
+    
+    # Early exit if rename resolves to same directory path
+    if os.path.normcase(os.path.abspath(source_dir)) == os.path.normcase(os.path.abspath(new_source_dir)):
+        return True
+        
+    # Check for overwrite
+    if os.path.exists(new_source_dir):
+        raise FileExistsError(f"Destination folder already exists: {new_source_dir}")
+        
+    # Find all layers in QGIS project that point to files inside source_dir
+    try:
+        from qgis.core import QgsProject
+        project = QgsProject.instance()
+    except ImportError:
+        class MockProject:
+            def mapLayers(self):
+                return {}
+        project = MockProject()
+        
+    layers_to_update = []
+    seen_layers = set()
+    
+    if additional_layers:
+        for l in additional_layers:
+            if l and l.source():
+                p_path, q_params = split_qgis_source(l.source())
+                layers_to_update.append((l, p_path, q_params))
+                seen_layers.add(l)
+                
+    for l_id, l in project.mapLayers().items():
+        if l and l not in seen_layers and l.source():
+            p_path, q_params = split_qgis_source(l.source())
+            l_dir = os.path.dirname(p_path)
+            if os.path.normcase(os.path.abspath(l_dir)) == os.path.normcase(os.path.abspath(source_dir)):
+                layers_to_update.append((l, p_path, q_params))
+                seen_layers.add(l)
+                
+    # Copy directory contents recursively to avoid Windows file locks on move
+    shutil.copytree(source_dir, new_source_dir)
+    
+    try:
+        # Update QGIS layer sources to point to new directory
+        for l, p_path, q_params in layers_to_update:
+            filename = os.path.basename(p_path)
+            new_l_path = os.path.join(new_source_dir, filename).replace('\\', '/') + q_params
+            update_layer_source(l, new_l_path)
+            
+        # Process pending Qt events to force destruction of old providers
+        try:
+            from qgis.PyQt.QtCore import QCoreApplication
+            QCoreApplication.processEvents()
+        except ImportError:
+            try:
+                from qtpy.QtCore import QCoreApplication
+                QCoreApplication.processEvents()
+            except ImportError:
+                pass
+                
+        # Force garbage collection to release any Python-side wrappers
+        import gc
+        gc.collect()
+        
+        # Delete original directory with a retry loop for Windows locks
+        import time
+        deleted = False
+        for attempt in range(20):
+            try:
+                shutil.rmtree(source_dir)
+                deleted = True
+                break
+            except Exception:
+                try:
+                    from qgis.PyQt.QtCore import QCoreApplication
+                    QCoreApplication.processEvents()
+                except ImportError:
+                    pass
+                gc.collect()
+                time.sleep(0.05)
+                
+        if not deleted:
+            import logging
+            logging.getLogger(__name__).warning("Failed to remove old parent directory %s after multiple attempts due to locks", source_dir)
+            
+    except Exception as e:
+        # Rollback copied new directory if anything failed before we updated all layers
+        try:
+            if os.path.exists(new_source_dir):
+                shutil.rmtree(new_source_dir)
+        except Exception as rollback_err:
+            import logging
+            logging.getLogger(__name__).error("Failed to rollback copied destination directory %s: %s", new_source_dir, rollback_err)
+        raise e
+        
+    return True
+
+def safe_rename_parent_dir(layer, new_dir_name):
+    phys_source_path, query_params = split_qgis_source(layer.source())
+    if not phys_source_path:
+        return False
+    source_dir = os.path.dirname(phys_source_path)
+    return safe_rename_dir(source_dir, new_dir_name, additional_layers=[layer])
+
 def format_size(size_in_bytes):
     """Formats the size in bytes to a human-readable string."""
     if size_in_bytes <= 0:
-        return "N/A"
+        return "-"
     val = float(size_in_bytes)
     for unit in ['B', 'KB', 'MB', 'GB']:
         if val < 1024.0:

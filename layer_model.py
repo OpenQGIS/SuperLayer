@@ -102,6 +102,14 @@ except ImportError:
                         return self._root_item
                     def item(self, row, column=0):
                         return self.child(row, column)
+try:
+    from .translation import tr
+except ImportError:
+    try:
+        from translation import tr
+    except ImportError:
+        def tr(text, disambiguation=None): return text
+
 
 try:
     from qgis.core import QgsProject, QgsMapLayer, QgsLayerTreeGroup, QgsLayerTreeLayer
@@ -163,9 +171,13 @@ except ImportError:
             if not source_path:
                 return "", ""
             parts = source_path.split('|', 1)
-            if len(parts) == 2:
-                return parts[0], '|' + parts[1]
-            return source_path, ""
+            phys_path = parts[0]
+            q_params = '|' + parts[1] if len(parts) == 2 else ""
+            if '?' in phys_path:
+                sub_parts = phys_path.split('?', 1)
+                phys_path = sub_parts[0]
+                q_params = '?' + sub_parts[1] + q_params
+            return phys_path.replace('\\', '/'), q_params
         
         def get_associated_files(file_path):
             phys_path, _ = split_qgis_source(file_path)
@@ -174,7 +186,7 @@ except ImportError:
         def format_size(size_in_bytes):
             """Formats the size in bytes to a human-readable string."""
             if size_in_bytes <= 0:
-                return "N/A"
+                return "-"
             val = float(size_in_bytes)
             for unit in ['B', 'KB', 'MB', 'GB']:
                 if val < 1024.0:
@@ -316,6 +328,10 @@ def _get_folder_icon_path(is_physical, path=""):
             p = os.path.join(icons_dir, "Document_Invalid.svg")
             if os.path.exists(p):
                 return p
+        elif path == "在线图层":
+            p = os.path.join(icons_dir, "Document_online.svg")
+            if os.path.exists(p):
+                return p
                 
         lower_path = path.lower()
         if lower_path.endswith('.zip'):
@@ -388,7 +404,13 @@ def _get_folder_icon(is_physical, path=""):
 class FolderItem(QStandardItem):
     """QStandardItem subclass representing a folder path or QGIS layer group."""
     def __init__(self, folder_path, is_physical=True):
-        super().__init__(os.path.basename(folder_path) if folder_path else "根目录")
+        if not folder_path:
+            display_name = tr("根目录")
+        elif folder_path in ["在线图层", "虚拟图层", "临时图层", "不可用图层", "内存与临时图层", "无效图层"]:
+            display_name = tr(folder_path)
+        else:
+            display_name = os.path.basename(folder_path)
+        super().__init__(display_name)
         self.folder_path = folder_path
         self.is_physical = is_physical
         self.setData(folder_path, Qt.ItemDataRole.UserRole)
@@ -462,12 +484,12 @@ class LayerTreeModel(QStandardItemModel):
     """Model that reads QGIS layers and exposes them grouped by physical folders or virtual groups."""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setHorizontalHeaderLabels(["图层", "文件大小", "物理路径"])
+        self.setHorizontalHeaderLabels([tr("图层"), tr("文件大小"), tr("物理路径")])
 
     def rebuild_model(self, group_by_physical=True, filter_format=None):
         """Clears and rebuilds the model hierarchy from the current QgsProject."""
         self.clear()
-        self.setHorizontalHeaderLabels(["图层", "文件大小", "物理路径"])
+        self.setHorizontalHeaderLabels([tr("图层"), tr("文件大小"), tr("物理路径")])
 
         project = QgsProject.instance()
         if not project:
@@ -729,7 +751,7 @@ class LayerTreeModel(QStandardItemModel):
                         size_item_group.setText(format_size(total_group_size))
                         size_item_group.setData(total_group_size, Qt.ItemDataRole.UserRole)
                     else:
-                        size_item_group.setText("N/A")
+                        size_item_group.setText("-")
                         size_item_group.setData(0, Qt.ItemDataRole.UserRole)
 
             elif isinstance(child, QgsLayerTreeLayer):
@@ -763,7 +785,7 @@ class LayerTreeModel(QStandardItemModel):
                     name_item = LayerItem(None, child.name())
                     name_item.setData(layer_id, Qt.ItemDataRole.UserRole)
                     
-                    size_item = QStandardItem("N/A")
+                    size_item = QStandardItem("-")
                     size_item.setData(0, Qt.ItemDataRole.UserRole)
                     size_item.setFlags(size_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     
