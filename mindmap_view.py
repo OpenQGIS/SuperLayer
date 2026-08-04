@@ -1,6 +1,14 @@
 import os
 
 try:
+    from qgis.PyQt import sip as _sip
+except ImportError:
+    try:
+        import sip as _sip
+    except ImportError:
+        _sip = None
+
+try:
     from qgis.PyQt.QtCore import Qt, QPointF, QRectF, QLineF, QObject, pyqtSignal as Signal
     from qgis.PyQt.QtGui import QPainter, QPainterPath, QColor, QFont, QIcon, QPixmap, QPen, QBrush, QCursor
     from qgis.PyQt.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsLineItem,
@@ -70,9 +78,13 @@ except ImportError:
                 class QObject:
                     def __init__(self, *args, **kw): pass
                 class Signal:
-                    def __init__(self, *args): pass
-                    def emit(self, *args): pass
-                    def connect(self, slot): pass
+                    def __init__(self, *args):
+                        self._slots = []
+                    def emit(self, *args):
+                        for slot in self._slots:
+                            slot(*args)
+                    def connect(self, slot):
+                        self._slots.append(slot)
                 class QPointF:
                     def __init__(self, x=0.0, y=0.0):
                         self._x = x
@@ -158,15 +170,21 @@ except ImportError:
                 class QGraphicsView:
                     NoDrag = 0
                     ScrollHandDrag = 1
+                    RubberBandDrag = 2
                     AnchorUnderMouse = 1
                     class DragMode:
                         NoDrag = 0
                         ScrollHandDrag = 1
+                        RubberBandDrag = 2
                     class ViewportAnchor:
                         AnchorUnderMouse = 1
-                    def __init__(self, *args, **kw): pass
+                    def __init__(self, *args, **kw):
+                        self._drag_mode = 0
                     def setScene(self, scene): pass
-                    def setDragMode(self, mode): pass
+                    def setDragMode(self, mode):
+                        self._drag_mode = mode
+                    def dragMode(self):
+                        return getattr(self, '_drag_mode', 0)
                     def setRenderHints(self, hints): pass
                     def setTransformationAnchor(self, anchor): pass
                     def scale(self, sx, sy): pass
@@ -286,7 +304,7 @@ class MindMapNode:
     def __init__(self, name, is_physical_folder=False, layer=None, path=""):
         self.name = name
         self.is_physical_folder = is_physical_folder
-        self.layer = layer
+        self._layer = layer
         self.path = path
         self.children = []
         self.parent = None
@@ -300,6 +318,43 @@ class MindMapNode:
         self.subtree_span = 0.0
         
         self.item = None
+
+    @property
+    def layer(self):
+        """Return None after QGIS deletes the wrapped C++ layer object."""
+        layer = self._layer
+        if layer is None or _sip is None:
+            return layer
+        try:
+            if _sip.isdeleted(layer):
+                self._layer = None
+                return None
+        except (RuntimeError, TypeError):
+            # During project updates a wrapper can disappear between frames.
+            self._layer = None
+            return None
+        return layer
+
+    @layer.setter
+    def layer(self, value):
+        self._layer = value
+
+
+def is_mindmap_node_effectively_visible(node):
+    if not node:
+        return True
+    if node.layer:
+        try:
+            from .layer_model import is_layer_effectively_visible
+        except ImportError:
+            try:
+                from layer_model import is_layer_effectively_visible
+            except ImportError:
+                def is_layer_effectively_visible(l): return True
+        return is_layer_effectively_visible(node.layer)
+    if node.children:
+        return any(is_mindmap_node_effectively_visible(child) for child in node.children)
+    return True
 
 
 class MindMapNodeItem(QGraphicsObject):
@@ -430,6 +485,8 @@ class MindMapNodeItem(QGraphicsObject):
                         fmt = "tif"
                     elif ext == ".gpkg":
                         fmt = "gpkg"
+                    elif ext in [".sqlite", ".db", ".spatialite"]:
+                        fmt = "sqlite"
                     elif ext in [".geojson", ".json"]:
                         fmt = "geojson"
                     elif ext in [".kml", ".kmz"]:
@@ -443,20 +500,16 @@ class MindMapNodeItem(QGraphicsObject):
                         if provider in ["wms", "wfs", "wcs", "arcgisfeatureserver", "arcgismapserver", "wms-tile", "xyz-tile"]:
                             fmt = "online"
                             
-        # Define color mappings
-        colors = {
-            "shp": {"bg": "#e8f5e9", "border": "#a5d6a7", "text": "#1b5e20"},      # Mint Green
-            "tif": {"bg": "#fff3e0", "border": "#ffcc80", "text": "#e65100"},      # Warm Orange
-            "gpkg": {"bg": "#f3e5f5", "border": "#e1bee7", "text": "#4a148c"},     # Soft Lavender
-            "geojson": {"bg": "#fce4ec", "border": "#f8bbd0", "text": "#880e4f"},  # Soft Rose
-            "kml": {"bg": "#e0f7fa", "border": "#b2ebf2", "text": "#006064"},      # Soft Cyan
-            "csv": {"bg": "#efebe9", "border": "#d7ccc8", "text": "#4e342e"},      # Sand/Wood
-            "dxf": {"bg": "#ffebee", "border": "#ffcdd2", "text": "#b71c1c"},      # Terracotta/Red
-            "memory": {"bg": "#eceff1", "border": "#cfd8dc", "text": "#37474f"},   # Slate/Grey
-            "online": {"bg": "#e3f2fd", "border": "#bbdefb", "text": "#0d47a1"},   # Ocean Blue
-            "other": {"bg": "#fafafa", "border": "#e0e0e0", "text": "#424242"}     # Neutral Grey
-        }
-        return colors.get(fmt, colors["other"])
+        try:
+            from .layer_model import get_format_color_dict
+        except ImportError:
+            try:
+                from layer_model import get_format_color_dict
+            except ImportError:
+                def get_format_color_dict(f):
+                    return {"bg": "#fafafa", "border": "#e0e0e0", "text": "#424242"}
+                    
+        return get_format_color_dict(fmt)
 
     def boundingRect(self):
         # Expand bounding rect slightly to the right to cover the collapse indicator
@@ -465,6 +518,7 @@ class MindMapNodeItem(QGraphicsObject):
 
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        is_eff_vis = is_mindmap_node_effectively_visible(self.node)
         
         # 1. Background round rect
         rect = QRectF(0.0, 0.0, self.node.width, self.node.height)
@@ -477,6 +531,8 @@ class MindMapNodeItem(QGraphicsObject):
             # Layer node styling - colored by file format
             colors = self._get_format_colors()
             bg_color = QColor(colors["bg"]).darker(108) if is_selected else QColor(colors["bg"])
+            if not is_eff_vis:
+                bg_color = bg_color.darker(115)
             border_color = QColor(colors["text"]) if (is_selected or self.hovered) else QColor(colors["border"])
             border_width = 2.0 if is_selected else (1.5 if self.hovered else 1.0)
             text_color = QColor(colors["text"])
@@ -484,6 +540,8 @@ class MindMapNodeItem(QGraphicsObject):
             # Folder node styling
             is_drag_target = getattr(self, 'drag_highlight', False)
             bg_color = QColor("#e7f1ff") if is_drag_target else (QColor("#f1f3f5") if is_selected else QColor("#f8f9fa"))
+            if not is_eff_vis:
+                bg_color = bg_color.darker(115)
             border_color = QColor("#0d6efd") if (is_selected or is_drag_target or self.hovered) else QColor("#ced4da")
             border_width = 2.0 if (is_selected or is_drag_target) else (1.5 if self.hovered else 1.0)
             text_color = QColor("#0d6efd") if is_drag_target else QColor("#495057")
@@ -506,6 +564,24 @@ class MindMapNodeItem(QGraphicsObject):
             has_icon = True
         elif self.node_icon and not self.node_icon.isNull():
             self.node_icon.paint(painter, icon_rect.toRect())
+            has_icon = True
+            
+        if not is_eff_vis:
+            plugin_dir = os.path.dirname(os.path.abspath(__file__))
+            hide_icon_path = os.path.join(plugin_dir, "icons_component", "Component_layer_hide.svg")
+            if os.path.exists(hide_icon_path):
+                try:
+                    hide_renderer = QSvgRenderer(hide_icon_path)
+                    if hide_renderer.isValid():
+                        painter.save()
+                        if hasattr(painter, 'setOpacity'):
+                            painter.setOpacity(0.9)
+                        hide_rect = QRectF(icon_rect.x() + 3.0, icon_rect.y() + 3.0, 12.0, 12.0)
+                        hide_renderer.render(painter, hide_rect)
+                        painter.restore()
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).debug("Failed to render hide icon in mindmap: %s", e)
             has_icon = True
             
         if has_icon:
@@ -590,7 +666,7 @@ class MindMapNodeItem(QGraphicsObject):
             event.accept()
         else:
             super().mousePressEvent(event)
-            if event.button() == Qt.MouseButton.LeftButton and self.node.layer:
+            if event.button() == Qt.MouseButton.LeftButton and (self.node.layer or (self.node.is_physical_folder and self.node.path)):
                 self._drag_start_pos = event.screenPos()
                 self._is_dragging = False
                 event.accept()
@@ -598,7 +674,7 @@ class MindMapNodeItem(QGraphicsObject):
                 self.layerClicked.emit(self.node.layer.id())
 
     def mouseMoveEvent(self, event):
-        if event.buttons() & Qt.MouseButton.LeftButton and self.node.layer and hasattr(self, '_drag_start_pos'):
+        if event.buttons() & Qt.MouseButton.LeftButton and (self.node.layer or (self.node.is_physical_folder and self.node.path)) and hasattr(self, '_drag_start_pos'):
             delta = event.screenPos() - self._drag_start_pos
             dist = (delta.x()**2 + delta.y()**2)**0.5
             
@@ -630,7 +706,7 @@ class MindMapNodeItem(QGraphicsObject):
         if event.button() == Qt.MouseButton.RightButton:
             event.accept()
             return
-        if event.button() == Qt.MouseButton.LeftButton and self.node.layer:
+        if event.button() == Qt.MouseButton.LeftButton and (self.node.layer or (self.node.is_physical_folder and self.node.path)):
             if getattr(self, '_is_dragging', False):
                 self._is_dragging = False
                 view = self.scene().views()[0] if (self.scene() and self.scene().views()) else None
@@ -638,7 +714,8 @@ class MindMapNodeItem(QGraphicsObject):
                     view.end_dragging(event.scenePos())
             else:
                 self.setSelected(True)
-                self.layerClicked.emit(self.node.layer.id())
+                if self.node.layer:
+                    self.layerClicked.emit(self.node.layer.id())
             event.accept()
         else:
             super().mouseReleaseEvent(event)
@@ -722,6 +799,7 @@ class MindMapView(QGraphicsView):
     layerDoubleClicked = Signal(str)
     contextMenuTriggered = Signal(object, object) # node, global_pos
     layerRelocationRequested = Signal(str, str) # layer_id, target_folder_path
+    folderRelocationRequested = Signal(str, str) # source_folder_path, target_folder_path
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -730,7 +808,7 @@ class MindMapView(QGraphicsView):
         
         # Antialiasing & View Settings
         self.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform)
-        self.setDragMode(QGraphicsView.DragMode.NoDrag) # Dragging nodes with left click, panning with middle click
+        self.setDragMode(QGraphicsView.DragMode.RubberBandDrag) # Box selection with left click, dragging nodes with left click, panning with middle click
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         
         # Hide scrollbars for cleaner canvas look
@@ -1189,15 +1267,24 @@ class MindMapView(QGraphicsView):
         self._drag_target_item = None
         self._drag_start_pos = None
         
-        if source_item and target_item and source_item.node.layer and not target_item.node.layer:
-            layer_id = source_item.node.layer.id()
-            target_folder_path = target_item.node.path
-            self.layerRelocationRequested.emit(layer_id, target_folder_path)
+        if source_item and target_item:
+            if source_item.node.layer and not target_item.node.layer:
+                layer_id = source_item.node.layer.id()
+                target_folder_path = target_item.node.path
+                self.layerRelocationRequested.emit(layer_id, target_folder_path)
+            elif not source_item.node.layer and source_item.node.is_physical_folder and source_item.node.path and not target_item.node.layer:
+                source_folder_path = source_item.node.path
+                target_folder_path = target_item.node.path
+                self.folderRelocationRequested.emit(source_folder_path, target_folder_path)
 
     def _find_folder_at(self, scene_pos):
         items = self.scene_obj.items(scene_pos)
         for item in items:
             if isinstance(item, MindMapNodeItem) and not item.node.layer:
+                if item.node.path:
+                    actual_path = resolve_physical_path(item.node.path)
+                    if actual_path and os.path.exists(actual_path) and not os.path.isdir(actual_path):
+                        continue
                 return item
         return None
 

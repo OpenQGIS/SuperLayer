@@ -11,7 +11,7 @@ try:
     from qgis.PyQt.QtWidgets import (
         QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
         QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
-        QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu
+        QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu, QToolButton
     )
 except ImportError:
     try:
@@ -20,7 +20,7 @@ except ImportError:
         from qtpy.QtWidgets import (
             QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
             QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
-            QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu
+            QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu, QToolButton
         )
     except ImportError:
         try:
@@ -29,7 +29,7 @@ except ImportError:
             from PySide2.QtWidgets import (
                 QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
                 QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
-                QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu
+                QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu, QToolButton
             )
         except ImportError:
             try:
@@ -38,7 +38,7 @@ except ImportError:
                 from PySide6.QtWidgets import (
                     QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
                     QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
-                    QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu
+                    QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu, QToolButton
                 )
             except ImportError:
                 # Basic mocks for CLI testing
@@ -69,6 +69,9 @@ except ImportError:
                         ItemIsEditable = 2
                         ItemIsEnabled = 4
                         NoItemFlags = 0
+                    class Corner:
+                        TopRightCorner = 1
+                    TopRightCorner = 1
                 class QSize:
                     def __init__(self, w, h): pass
                 class QIcon:
@@ -166,9 +169,29 @@ except ImportError:
                         super().__init__()
                         self.tabs = []
                         self.currentChanged = _Signal()
+                        self._corner_widget = None
                     def addTab(self, w, name):
                         self.tabs.append((w, name))
                     def currentIndex(self): return 0
+                    def setCornerWidget(self, widget, corner=None):
+                        self._corner_widget = widget
+                class QToolButton(QWidget):
+                    def __init__(self, parent=None):
+                        super().__init__(parent)
+                        self.toggled = _Signal()
+                        self._checkable = False
+                        self._checked = False
+                        self._tooltip = ""
+                        self._icon = None
+                        self._icon_size = None
+                    def setCheckable(self, val):
+                        self._checkable = val
+                    def setToolTip(self, val):
+                        self._tooltip = val
+                    def setIcon(self, icon):
+                        self._icon = icon
+                    def setIconSize(self, size):
+                        self._icon_size = size
                 class QTableWidget(QWidget):
                     def __init__(self, parent=None):
                         super().__init__()
@@ -495,6 +518,7 @@ class LayerBoardWidget(QWidget):
         
         self.styleWidget = None
         self.styleLayer = None
+        self.filter_visible_only = False
         
         self.init_ui()
         
@@ -924,6 +948,19 @@ class LayerBoardWidget(QWidget):
             if layerType == 'raster' and layer.type() != QgsMapLayer.LayerType.RasterLayer:
                 continue
                 
+            # Filter visible layers only if option is active
+            if getattr(self, 'filter_visible_only', False):
+                try:
+                    from .layer_model import is_layer_effectively_visible
+                except ImportError:
+                    try:
+                        from layer_model import is_layer_effectively_visible
+                    except ImportError:
+                        def is_layer_effectively_visible(l):
+                            return True
+                if not is_layer_effectively_visible(layer):
+                    continue
+                
             self.layerBoardChangedData[layerType][lid] = {}
             lineData = []
             
@@ -963,6 +1000,12 @@ class LayerBoardWidget(QWidget):
                 
                 if attr['key'] == 'name':
                     icon = QgsMapLayerModel.iconForLayer(layer)
+                    try:
+                        from .layer_model import is_layer_visible, _create_hidden_layer_icon
+                    except ImportError:
+                        from layer_model import is_layer_visible, _create_hidden_layer_icon
+                    if not is_layer_visible(layer):
+                        icon = _create_hidden_layer_icon(icon)
                     newItem.setIcon(icon)
                     
                 table.setItem(twRowCount, i, newItem)
@@ -1206,7 +1249,7 @@ class LayerBoardWidget(QWidget):
         if not hasattr(layer, 'writeLayerXML'):
             return
         try:
-            from qgis.PyQt.QtXml import QDomDocument, QDomElement
+            from qgis.PyQt.QtXml import QDomDocument
         except ImportError:
             # Fallback mock for unit testing environment
             class QDomDocument:
@@ -1365,6 +1408,10 @@ class LayerBoardWidget(QWidget):
         project.setDirty(True)
         self.populateLayerTable('vector')
         self.populateLayerTable('raster')
+
+    def on_filter_visible_toggled(self, checked):
+        self.filter_visible_only = checked
+        self.refreshTables()
 
     def onTabChanged(self):
         idx = self.tab_widget.currentIndex()
@@ -1632,7 +1679,7 @@ class LayerBoardWidget(QWidget):
         
         act_backup = menu.addAction(self.tr("备份选中的 {} 个文件到…").format(num_layers))
         act_backup.setToolTip(self.tr("从原始路径加载文件"))
-        set_icon(act_backup, "Copy_to_new_folder.svg")
+        set_icon(act_backup, "Backup_to_new_folder.svg")
         
         act_rename = menu.addAction(self.tr("重命名文件"))
         act_rename.setEnabled(num_layers == 1)

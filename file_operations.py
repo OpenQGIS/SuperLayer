@@ -410,6 +410,164 @@ def safe_rename_parent_dir(layer, new_dir_name):
     source_dir = os.path.dirname(phys_source_path)
     return safe_rename_dir(source_dir, new_dir_name, additional_layers=[layer])
 
+def safe_migrate_dir(source_path, target_parent_dir, additional_layers=None):
+    if not source_path or not os.path.exists(source_path):
+        return False
+    source_path = os.path.abspath(source_path).replace('\\', '/')
+    target_parent_dir = os.path.abspath(target_parent_dir).replace('\\', '/')
+    
+    basename = os.path.basename(source_path)
+    new_path = os.path.join(target_parent_dir, basename).replace('\\', '/')
+    
+    # Early exit if same path
+    if os.path.normcase(os.path.abspath(source_path)) == os.path.normcase(os.path.abspath(new_path)):
+        return True
+        
+    # Check if target is inside source (only if source is a directory)
+    if os.path.isdir(source_path):
+        norm_source = os.path.normcase(os.path.abspath(source_path))
+        norm_new = os.path.normcase(os.path.abspath(new_path))
+        if norm_new == norm_source or norm_new.startswith(norm_source + os.sep) or norm_new.replace('\\', '/').startswith(norm_source.replace('\\', '/') + '/'):
+            raise ValueError("Cannot move a directory inside itself.")
+            
+    # Check for overwrite
+    if os.path.exists(new_path):
+        raise FileExistsError(f"Destination path already exists: {new_path}")
+        
+    # Find all layers in QGIS project that point to files inside/at source_path
+    try:
+        from qgis.core import QgsProject
+        project = QgsProject.instance()
+    except ImportError:
+        class MockProject:
+            def mapLayers(self):
+                return {}
+        project = MockProject()
+        
+    layers_to_update = []
+    seen_layers = set()
+    
+    if additional_layers:
+        for l in additional_layers:
+            if l and l.source():
+                p_path, q_params = split_qgis_source(l.source())
+                layers_to_update.append((l, p_path, q_params))
+                seen_layers.add(l)
+                
+    # Helper to check if a path is under source_path (or is source_path itself)
+    def is_under_or_equal(path, parent):
+        norm_p = os.path.normcase(os.path.abspath(path))
+        norm_parent = os.path.normcase(os.path.abspath(parent))
+        return norm_p == norm_parent or norm_p.startswith(norm_parent + os.sep) or norm_p.replace('\\', '/').startswith(norm_parent.replace('\\', '/') + '/')
+
+    for l_id, l in project.mapLayers().items():
+        if l and l not in seen_layers and l.source():
+            p_path, q_params = split_qgis_source(l.source())
+            actual_p_path = resolve_physical_path(p_path)
+            if is_under_or_equal(actual_p_path, source_path):
+                layers_to_update.append((l, p_path, q_params))
+                seen_layers.add(l)
+                
+    # Copy the directory or file
+    if os.path.isdir(source_path):
+        shutil.copytree(source_path, new_path)
+    else:
+        # It's a file (like GPKG). Make sure the parent dir exists.
+        parent_dir = os.path.dirname(new_path)
+        if not os.path.exists(parent_dir):
+            os.makedirs(parent_dir)
+        shutil.copy2(source_path, new_path)
+        # Copy GPKG sidecar WAL/SHM if they exist
+        for log_ext in ['-wal', '-shm']:
+            log_src = source_path + log_ext
+            log_dest = new_path + log_ext
+            if os.path.exists(log_src):
+                try:
+                    shutil.copy2(log_src, log_dest)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).debug("Failed to copy sidecar file %s: %s", log_src, e)
+        
+    try:
+        # Update QGIS layer sources
+        for l, p_path, q_params in layers_to_update:
+            if os.path.isdir(source_path):
+                rel_path = os.path.relpath(p_path, source_path)
+                new_l_path = os.path.normpath(os.path.join(new_path, rel_path)).replace('\\', '/') + q_params
+            else:
+                new_l_path = new_path + q_params
+            update_layer_source(l, new_l_path)
+            
+        # Process pending Qt events to force destruction of old providers
+        try:
+            from qgis.PyQt.QtCore import QCoreApplication
+            QCoreApplication.processEvents()
+        except ImportError:
+            try:
+                from qtpy.QtCore import QCoreApplication
+                QCoreApplication.processEvents()
+            except ImportError:
+                pass
+                
+        # Force garbage collection to release any Python-side wrappers
+        import gc
+        gc.collect()
+        
+        # Delete original directory/file with retry loop
+        import time
+        deleted = False
+        for attempt in range(20):
+            try:
+                if os.path.isdir(source_path):
+                    shutil.rmtree(source_path)
+                else:
+                    os.remove(source_path)
+                    for log_ext in ['-wal', '-shm']:
+                        log_src = source_path + log_ext
+                        if os.path.exists(log_src):
+                            try:
+                                os.remove(log_src)
+                            except Exception as e:
+                                import logging
+                                logging.getLogger(__name__).debug("Failed to remove sidecar file %s: %s", log_src, e)
+                deleted = True
+                break
+            except Exception:
+                try:
+                    from qgis.PyQt.QtCore import QCoreApplication
+                    QCoreApplication.processEvents()
+                except ImportError:
+                    pass
+                gc.collect()
+                time.sleep(0.05)
+                
+        if not deleted:
+            import logging
+            logging.getLogger(__name__).warning("Failed to remove old path %s after multiple attempts due to locks", source_path)
+            
+    except Exception as e:
+        # Rollback
+        try:
+            if os.path.exists(new_path):
+                if os.path.isdir(new_path):
+                    shutil.rmtree(new_path)
+                else:
+                    os.remove(new_path)
+                    for log_ext in ['-wal', '-shm']:
+                        log_dest = new_path + log_ext
+                        if os.path.exists(log_dest):
+                            try:
+                                os.remove(log_dest)
+                            except Exception as e:
+                                import logging
+                                logging.getLogger(__name__).debug("Failed to remove sidecar file %s during rollback: %s", log_dest, e)
+        except Exception as rollback_err:
+            import logging
+            logging.getLogger(__name__).error("Failed to rollback copied path %s: %s", new_path, rollback_err)
+        raise e
+        
+    return True
+
 def format_size(size_in_bytes):
     """Formats the size in bytes to a human-readable string."""
     if size_in_bytes <= 0:

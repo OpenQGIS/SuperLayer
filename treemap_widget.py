@@ -27,7 +27,21 @@ except ImportError:
                     TextWordWrap = 64
                     LeftButton = 1
                     RightButton = 2
+                    ElideRight = 1
                     
+                    class AlignmentFlag:
+                        AlignCenter = 132
+                        
+                    class TextFlag:
+                        TextWordWrap = 64
+                        
+                    class MouseButton:
+                        LeftButton = 1
+                        RightButton = 2
+                        
+                    class TextElideMode:
+                        ElideRight = 1
+
                 class QRectF:
                     def __init__(self, x=0.0, y=0.0, width=0.0, height=0.0):
                         self._x = float(x)
@@ -202,6 +216,74 @@ class TreeMapNode:
         self.rect = QRectF()  # Assigned coordinate box during layout
 
 
+def get_text_width(font_metrics, text):
+    try:
+        return font_metrics.horizontalAdvance(text)
+    except AttributeError:
+        try:
+            return font_metrics.width(text)
+        except AttributeError:
+            return len(text) * 8
+
+
+def elide_text(font_metrics, text, mode, width):
+    try:
+        return font_metrics.elidedText(text, mode, int(width))
+    except AttributeError:
+        char_w = 8
+        max_chars = max(0, int(width / char_w))
+        if len(text) <= max_chars:
+            return text
+        if max_chars <= 3:
+            return "..."[:max_chars]
+        return text[:max_chars - 3] + "..."
+
+
+def format_treemap_text(name, size_str, w, h, fm):
+    try:
+        lh = fm.lineSpacing()
+    except AttributeError:
+        try:
+            lh = fm.height()
+        except AttributeError:
+            lh = 15
+        
+    max_lines = int(h // lh)
+    if max_lines <= 0:
+        return []
+        
+    elide_mode = getattr(Qt.TextElideMode, 'ElideRight', getattr(Qt, 'ElideRight', 1))
+    
+    if max_lines == 1:
+        return [elide_text(fm, name, elide_mode, w)]
+        
+    max_name_lines = max_lines - 1
+    
+    wrapped_lines = []
+    current_line = ""
+    for char in name:
+        test_line = current_line + char
+        if get_text_width(fm, test_line) <= w:
+            current_line = test_line
+        else:
+            if current_line:
+                wrapped_lines.append(current_line)
+                current_line = char
+            else:
+                wrapped_lines.append(char)
+                current_line = ""
+    if current_line:
+        wrapped_lines.append(current_line)
+        
+    if len(wrapped_lines) <= max_name_lines:
+        name_lines = wrapped_lines
+    else:
+        name_lines = wrapped_lines[:max_name_lines - 1]
+        remaining_text = "".join(wrapped_lines[max_name_lines - 1:])
+        name_lines.append(elide_text(fm, remaining_text, elide_mode, w))
+        
+    return name_lines + [size_str]
+
 class TreeMapWidget(QWidget):
     layerSelected = Signal(str)  # Emits layer ID
     contextMenuTriggered = Signal(object, QPoint)  # Emits (TreeMapNode, global_pos)
@@ -256,6 +338,7 @@ class TreeMapWidget(QWidget):
     def update_layout(self):
         """Initiates layout calculation inside the current widget geometry."""
         if not self.nodes:
+            self.update()
             return
         
         total_size = sum(n.size for n in self.nodes)
@@ -353,7 +436,22 @@ class TreeMapWidget(QWidget):
             if r.width() < 5 or r.height() < 5:
                 continue
             
-            base_color = self.colors[idx % len(self.colors)]
+            try:
+                from .layer_model import get_layer_format, get_format_color_dict, is_layer_effectively_visible
+            except ImportError:
+                try:
+                    from layer_model import get_layer_format, get_format_color_dict, is_layer_effectively_visible
+                except ImportError:
+                    def get_layer_format(l): return "other"
+                    def get_format_color_dict(f): return {"treemap": "#9e9e9e"}
+                    def is_layer_effectively_visible(l): return True
+                    
+            fmt = get_layer_format(node.layer)
+            colors_dict = get_format_color_dict(fmt)
+            base_color = QColor(colors_dict["treemap"])
+            is_vis = is_layer_effectively_visible(node.layer)
+            if not is_vis:
+                base_color = base_color.darker(140)
             if node == self.hovered_node:
                 base_color = base_color.lighter(120)
                 pen = self.hover_pen
@@ -368,13 +466,45 @@ class TreeMapWidget(QWidget):
             painter.setBrush(QBrush(grad))
             painter.drawRect(r)
             
-            # Text layout: Only draw if space permits
-            if r.width() > 60 and r.height() > 35:
+            # Top-left invisible icon overlay if layer is not effectively visible
+            if not is_vis and r.width() >= 18 and r.height() >= 18:
+                plugin_dir = os.path.dirname(os.path.abspath(__file__))
+                hide_icon_path = os.path.join(plugin_dir, "icons_component", "Component_layer_hide.svg")
+                if os.path.exists(hide_icon_path):
+                    try:
+                        from qgis.PyQt.QtGui import QIcon
+                    except ImportError:
+                        try:
+                            from qtpy.QtGui import QIcon
+                        except ImportError:
+                            QIcon = None
+                    if QIcon and hasattr(QIcon, 'pixmap'):
+                        icon = QIcon(hide_icon_path)
+                        px = icon.pixmap(18, 18)
+                        if px and hasattr(px, 'isNull') and not px.isNull() and hasattr(painter, 'drawPixmap'):
+                            painter.drawPixmap(int(r.x() + 6), int(r.y() + 6), px)
+            
+            pad_x = 4.0 if r.width() > 40 else 2.0
+            pad_y = 4.0 if r.height() > 30 else 2.0
+            w = int(r.width() - 2 * pad_x)
+            h = int(r.height() - 2 * pad_y)
+            
+            fm = painter.fontMetrics()
+            try:
+                lh = fm.lineSpacing()
+            except AttributeError:
+                try:
+                    lh = fm.height()
+                except AttributeError:
+                    lh = 15
+                
+            if w > 15 and h >= lh:
                 painter.setPen(self.text_color)
                 size_str = format_size(node.size)
-                # Word wrap for layer name and size
-                text = f"{node.layer.name()}\n{size_str}"
-                painter.drawText(r.adjusted(4.0, 4.0, -4.0, -4.0), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, text)
+                lines = format_treemap_text(node.layer.name(), size_str, w, h, fm)
+                if lines:
+                    text = "\n".join(lines)
+                    painter.drawText(r.adjusted(pad_x, pad_y, -pad_x, -pad_y), Qt.AlignmentFlag.AlignCenter, text)
 
     def leaveEvent(self, event):
         if self.hovered_node:

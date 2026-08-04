@@ -3,7 +3,7 @@ name=SuperLayer
 qgisMinimumVersion=3.0
 qgisMaximumVersion=4.99
 description=使用列表、文件夹树、思维导图、矩形树图或图层属性看板管理工程图层，支持右键菜单移动/复制/备份物理文件、样式管理、删除图层与删除文件等高级操作。/ Manage engineering layers using lists, folder trees, mind maps, rectangular tree diagrams, or layer property dashboards. Advanced operations include moving, copying, or backing up physical files via the right-click menu, style management, and deleting layers or files.
-version=1.7.2
+version=2.4.0
 author=OpenQGIS
 email=OpenQGIS@outlook.com
 about=使用思维导图或矩形树图查看 QGIS 图层，支持多选批量更新数据源/CRS/编码/可见比例尺；右键菜单提供移动、复制、备份物理文件（可选是否从新路径加载）；样式管理支持保存与清除默认样式；并可直接删除图层或永久删除物理文件（含确认保护）。/ View QGIS layers using mind maps or rectangular tree diagrams, supporting batch updates for multiple data sources/CRS/notations/visible scales; the right-click menu provides options to move, copy, or back up physical files (with optional re-loading from new paths); Style management allows saving or clearing default styles; and you can directly delete layers or permanently delete physical files (with protection confirmation).
@@ -14,6 +14,58 @@ homepage=https://github.com/OpenQGIS/SuperLayer
 category=Plugins
 icon=icons/SuperLayer.png
 changelog=
+    Version 2.4.0:
+    - ✨ 新增临时矢量图层统一批量保存窗口，支持将多个图层保存到同一 GeoPackage、KML、FileGDB 或 Shapefile 文件夹。/ Added a unified batch export dialog for saving temporary vector layers to one GeoPackage, KML, FileGDB, or Shapefile folder.
+    - 🚀 优化批量保存流程，支持格式联动路径、名称冲突处理、逐层写入验证及统一结果汇总。/ Improved batch saving with format-aware destinations, name conflict handling, per-layer validation, and a consolidated result summary.
+    - 🚀 临时图层导出后完整保留原有符号渲染、标注、图表及其他项目样式。/ Preserved symbology, labeling, diagrams, and other project styles when exporting temporary layers.
+    - 🐛 修复批量保存替换临时图层时，保存结果与思维导图访问已释放图层对象导致的运行错误。/ Fixed runtime errors caused by save results and the mind map accessing released layer objects after batch replacement.
+
+    Version 2.3.0:
+    - ✨ 文件夹视图、思维导图与矩形树图全视图支持主干文件夹、文件类型及各层级节点的不可见图标遮罩与视觉反馈。/ Added invisible icon overlays and visual feedback across folder trees, mind maps, and treemap views for folder, file-type, and layer nodes.
+
+    Version 2.2.0:
+    - 🐛 修复"只展示显示图层"过滤逻辑：群组不可见时，群组内已勾选的子图层也会被正确过滤排除，不再显示在列表中。/ Fixed "Show visible layers only" filter logic: layers inside invisible groups are now correctly excluded from all views, even when their own checkbox is checked.
+    - ✨ 不可见的群组与文件夹图标叠加半透明隐藏遮罩，与图层的视觉反馈保持一致。/ Invisible group and folder items now display a dimmed hidden-icon overlay, visually consistent with the treatment of hidden layers.
+
+    Version 2.1.0:
+    - ✨拖拽图层或文件夹物理重定位时，弹窗提供“移动”、“复制”、“备份”三个选项，并匹配专属 SVG 图标。/ Added Move, Copy, Backup selection dialog with matching SVG icons when dragging layers or folders.
+    - ✨选择操作弹窗中直观列出所操作图层的所有关联物理伴生文件（如 .shp, .prj, .dbf, .pdf 等），保障操作透明。/ Listed all companion physical files (such as .shp, .prj, .dbf, .pdf) in the selection dialog.
+    - ❗ 优化取消按钮背景色为深灰色，提升弹窗视觉层级；修复 PyQt5/PyQt6 addButton 图标签名类型不匹配问题。/ Darkened the cancel button background for better hierarchy and fixed QMessageBox.addButton icon signature compatibility.
+
+    Version 2.0.0:
+    - ✨新增“只展示显示的图层”过滤功能，点击过滤按钮可即时刷新视图过滤隐藏图层。 / Added "Show visible layers only" filter to immediately refresh the view and filter hidden layers.
+    - ❗ 优化隐藏图层的图标展示，维持图层树与批量修改看板的视觉一致性。 / Optimized hidden layer icons to maintain visual consistency between the tree and the batch modification board.
+    - 🐛修复矩形树状图面板中超长文件名换行时文字显示不全的剪裁问题。 / Fixed text clipping issue for wrapping extremely long filenames in the Treemap.
+    - 🐛 修复在图层目录树中拖放文件夹物理迁移时偶发的 AttributeError 异常。 / Fixed occasional AttributeError when dragging and dropping folders for physical migration in the tree.
+
+    Version 1.9.0:
+    - ✨ 新增文件夹右键“迁移文件夹”功能与思维导图内拖拽移动文件夹位置。 / Added right-click "Migrate Folder" action and support for drag-and-drop folder relocation in the mindmap view.
+    - ✨ 新增思维导图框选图层（框选模式）功能，并支持通过拖动快速迁移图层。 / Added marquee selection in the mindmap view and support for dragging on the layer name column to quickly migrate layers.
+    - ✨ 新增批量修改面板的只展示显示图层过滤选项。 / Added a filter option in the batch modification board to show visible layers only.
+    - 🚀 优化图层取消显示时的图标展示，使其仍保留具体的图层类型图标。 / Improved hidden layer rendering to retain specific layer type icons instead of hiding them behind a hide icon.
+    - 🚀 重构右键菜单显示与隐藏图层动作，支持根据当前图层可见性状态动态排序并使用更美观的组件图标。 / Reordered show/hide layer actions dynamically based on layer visibility and upgraded their icons to modern component SVGs.
+
+    Version 1.7.9:
+    - 🚀 优化并规范图层格式识别逻辑，支持更多种栅格格式（如 jpg, jpeg, png 等）与 SQLite 衍生后缀的配色自动归类及正确显示。 / Standardized and optimized layer format classification to recognize a broader range of raster and database extensions for color unification.
+
+    Version 1.7.8:
+    - 🐛 修复图层树可见性改变信号同步触发时导致 QGIS 崩溃的 Bug，改用 QTimer 防抖异步刷新。 / Fixed QGIS crash issue during legend visibilityChanged synchronization by implementing a debounced QTimer-based asynchronous refresh.
+
+    Version 1.7.7:
+    - 🐛 修复矩形树状图文本绘制时由于坐标宽度为浮点数引发的 TypeError 错误。 / Fixed TypeError in treemap rendering caused by floating-point width arguments in QFontMetrics.elidedText().
+
+    Version 1.7.6:
+    - 🐛 修复路径导图中 SQLite/SpatiaLite 格式未匹配固定色彩的 Bug，支持该格式在各视图配色完美同步。 / Fixed colors mismatch bug for SQLite/SpatiaLite layers in the mind map, ensuring unified format-based color mapping across all views.
+
+    Version 1.7.5:
+    - ✨ 统一图层文件格式固定色彩，过滤标签栏、路径导图及矩形树状图配色完全匹配。 / Unified format-based color mappings across the filter tag bar, mind map nodes, and treemap blocks.
+
+    Version 1.7.4:
+    - ✨ 新增图层显示/隐藏控制功能，并为未启用的图层展示闭眼图标。 / Added layer visibility control (show/hide) actions and display a closed-eye icon for disabled layers.
+
+    Version 1.7.3:
+    - 🐛 修复矩形树状图超长图层名无法显示文字的 Bug，支持名字自动换行与截断。 / Fixed text display issue for extremely long layer names in the Treemap, supporting auto-wrapping and truncation.
+
     Version 1.7.2:
     * 🔍 新增右键缩放与双击行为重构：新增“缩放到图层”、“缩放到文件夹”、“缩放到图层组”右键选项，并移除双击自动缩放逻辑（改为仅选中激活）。对临时与在线图层自适应结合 QGIS 原生缩放和回退保护。/ Added right-click Zoom to Layer/Folder/Group actions, disabled automatic zoom on double-click, and integrated native QGIS zoom fallback for temporary/online layers.
     * 🛡️ GeoPackage 内部删除保护：将 GPKG 数据库图层的“删除文件”替换为“删除数据库内图层”，调用 OGR deleteLayer 仅删除库内表，防范误删整个物理数据库。/ Protected GPKG layers by replacing "Delete File" with "Delete Layer inside Database" to drop specific tables via OGR without deleting the entire database file.
@@ -23,12 +75,7 @@ changelog=
     * 🔄 添加英文描述。/ Add English description.
     Version 1.6.1:
     * 🔄 QGIS 4 与 Qt 6 全面适配：重构所有 Qt 导入模块，全面迁移至完全限定枚举（如 Qt.AlignmentFlag.AlignLeft 等），将 dialog/menu.exec_() 重命名为 exec()，并解决 QFontMetrics.width() 兼容性问题。/ Full QGIS 4 and Qt 6 compatibility: refactored all Qt imports to prioritize qgis.PyQt, migrated all Qt enums to fully scoped formats, renamed exec_() to exec(), and fixed QFontMetrics.width() compatibility.
-    * 🛡️ 安全合规与测试 Mock 优化：添加 .bandit 与 .flake8 配置文件排除本地备份和测试目录，将 except Exception 盲捕获改写为特定异常以符合安全扫描规程（Bandit 0 警告）；同时升级 CLI 环境下的 Mock Qt/QGIS 类，保障 88 个单元测试 100%% 通过。/ Security & test validation: added .bandit and .flake8 files to exclude developer and testing folders, resolved bare exceptions to pass bandit checks with 0 warnings, and updated CLI test mocks to keep 88 unittest cases passing.
-    * 🐛 移除局部 PyQt5 导入警告：将 mindmap_view.py 等文件中的局部 PyQt5 导入提升至模块级，彻底消除了扫描器的 PyQt 导入警告。/ Refactored local imports: elevated local PyQt5 imports in mindmap_view.py to module level to eliminate PyQt static import warnings.
-    Version 1.5.2:
-    * 🔒 深度安全加固与异常规整：消除项目内所有残留的参数拼接子进程调用，支持非 Windows 下安全的包含文件夹定位；全面重写了 20 多个 Bare Except 静默拦截块，通过引入针对性捕获与 logging 日志输出，提升底层逻辑稳定性和排查追踪性。/ Deep security hardening: eliminated all residual string subprocess calls, supported safe platform-agnostic folder opening; refactored 20+ silent try-except-pass blocks with targeted exception types and logging.
-    Version 1.5.1:
-    * 🔒 安全加固：subprocess.Popen 调用改为列表参数形式，消除命令注入风险（Bandit B602/B603）；非 Windows 平台文件夹打开改用跨平台 subprocess 替代 os.startfile（Bandit B606）；修复 bare except pass 静默吞掉异常的问题（Bandit BLE001）。/ Security hardening: replaced f-string subprocess calls with list args to eliminate injection risk; replaced os.startfile with cross-platform subprocess on non-Windows; replaced bare except pass with proper logging.
+
     Version 1.5.0:
     * 🗂️ 右键菜单全面重构：拆分为「移动」「复制」「备份」三个独立文件操作动作，分别通过鼠标悬停提示明示加载路径差异（从新路径/从原始路径加载）。/ Refactored context menu: separated Move, Copy, and Backup file actions with distinct hover tooltips indicating load path behavior.
     * 🎨 新增「样式管理」子菜单：支持「保存为默认样式」（调用 QGIS 官方 API）与「清除默认样式」（删除磁盘 .qml 文件并重置渲染器）。/ Added Style Management submenu with Save/Clear default style actions using QGIS native API and on-disk .qml management.
