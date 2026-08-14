@@ -1,63 +1,10 @@
 import os
 import re
 
-# Robust fallback imports for Qt
-try:
-    from qgis.PyQt.QtCore import Qt, QTranslator, QLocale, QCoreApplication
-    from qgis.PyQt.QtWidgets import QAction
-    from qgis.PyQt.QtGui import QIcon
-    from qgis.core import QgsSettings
-except ImportError:
-    try:
-        from qtpy.QtCore import Qt, QTranslator, QLocale, QCoreApplication
-        from qtpy.QtWidgets import QAction
-        from qtpy.QtGui import QIcon
-        class QgsSettings:
-            def value(self, key, default=None): return default
-    except ImportError:
-        try:
-            from PySide2.QtCore import Qt, QTranslator, QLocale, QCoreApplication
-            from PySide2.QtWidgets import QAction
-            from PySide2.QtGui import QIcon
-            class QgsSettings:
-                def value(self, key, default=None): return default
-        except ImportError:
-            try:
-                from PySide6.QtCore import Qt, QTranslator, QLocale, QCoreApplication
-                from PySide6.QtGui import QAction, QIcon
-                class QgsSettings:
-                    def value(self, key, default=None): return default
-            except ImportError:
-                # Basic mock classes for CLI tests without Qt installed
-                class Qt:
-                    RightDockWidgetArea = 2
-                class QAction:
-                    def __init__(self, text, parent=None):
-                        self._text = text
-                        self.parent = parent
-                        self.triggered = self._Signal()
-                    class _Signal:
-                        def connect(self, slot):
-                            self._slot = slot
-                        def emit(self, *args):
-                            if hasattr(self, '_slot'):
-                                self._slot(*args)
-                class QIcon:
-                    def __init__(self, *args):
-                        pass
-                class QTranslator:
-                    def load(self, *args, **kwargs): return False
-                class QLocale:
-                    class system:
-                        @staticmethod
-                        def name(): return "en"
-                class QCoreApplication:
-                    @staticmethod
-                    def installTranslator(*args): pass
-                    @staticmethod
-                    def removeTranslator(*args): pass
-                class QgsSettings:
-                    def value(self, key, default=None): return default
+from qgis.PyQt.QtCore import QTranslator, QLocale, QCoreApplication
+from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtGui import QIcon
+from qgis.core import QgsSettings
 
 def _qt_immediate_delete(obj):
     """Immediately destroy a Qt C++ object across all Qt bindings.
@@ -86,7 +33,7 @@ def _qt_immediate_delete(obj):
     ):
         try:
             _mod = _loader()
-        except ImportError:
+        except (ImportError, AttributeError):
             continue
         try:
             if not _mod.isdeleted(obj):
@@ -101,7 +48,7 @@ def _qt_immediate_delete(obj):
     ):
         try:
             _mod = _loader()
-        except ImportError:
+        except (ImportError, AttributeError):
             continue
         try:
             if _mod.isValid(obj):

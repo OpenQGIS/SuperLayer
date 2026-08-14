@@ -3,16 +3,6 @@
     <context>
         <name>SuperLayer</name>
         <message>
-            <source>
-
-关联的图层：
-{}</source>
-            <translation>
-
-关联的图层：
-{}</translation>
-        </message>
-        <message>
             <source>(总大小: {})</source>
             <translation>(总大小: {})</translation>
         </message>
@@ -39,24 +29,6 @@
         <message>
             <source>临时图层已成功保存为文件，并已加载到工程中。</source>
             <translation>临时图层已成功保存为文件，并已加载到工程中。</translation>
-        </message>
-        <message>
-            <source>以下图层处于编辑状态，请保存并关闭编辑模式后再尝试操作：
-{}</source>
-            <translation>以下图层处于编辑状态，请保存并关闭编辑模式后再尝试操作：
-{}</translation>
-        </message>
-        <message>
-            <source>以下数据库内图层未能成功删除：
-</source>
-            <translation>以下数据库内图层未能成功删除：
-</translation>
-        </message>
-        <message>
-            <source>以下文件未能删除：
-</source>
-            <translation>以下文件未能删除：
-</translation>
         </message>
         <message>
             <source>伴生文件数量: {} {}</source>
@@ -207,12 +179,6 @@
             <translation>图层【{}】物理文件已成功备份至目标目录。</translation>
         </message>
         <message>
-            <source>图层【{}】目前处于编辑状态。
-请先在 QGIS 中保存编辑并关闭编辑模式，然后再尝试操作。</source>
-            <translation>图层【{}】目前处于编辑状态。
-请先在 QGIS 中保存编辑并关闭编辑模式，然后再尝试操作。</translation>
-        </message>
-        <message>
             <source>图层分类</source>
             <translation>图层分类</translation>
         </message>
@@ -249,12 +215,6 @@
             <translation>备份冲突</translation>
         </message>
         <message>
-            <source>备份发生异常错误：
-{}</source>
-            <translation>备份发生异常错误：
-{}</translation>
-        </message>
-        <message>
             <source>备份失败</source>
             <translation>备份失败</translation>
         </message>
@@ -277,12 +237,6 @@
         <message>
             <source>复制冲突</source>
             <translation>复制冲突</translation>
-        </message>
-        <message>
-            <source>复制发生异常错误：
-{}</source>
-            <translation>复制发生异常错误：
-{}</translation>
         </message>
         <message>
             <source>复制图层失败: {}</source>
@@ -353,20 +307,6 @@
             <translation>成功将 {} 个图层的文件移动到新目录。</translation>
         </message>
         <message>
-            <source>成功移动了 {} 个图层，但以下图层移动失败：
-{}</source>
-            <translation>成功移动了 {} 个图层，但以下图层移动失败：
-{}</translation>
-        </message>
-        <message>
-            <source>成功：{} 个
-跳过：{} 个
-失败：{} 个</source>
-            <translation>成功：{} 个
-跳过：{} 个
-失败：{} 个</translation>
-        </message>
-        <message>
             <source>所有勾选图层将作为独立图层写入同一个容器。</source>
             <translation>所有勾选图层将作为独立图层写入同一个容器。</translation>
         </message>
@@ -409,36 +349,6 @@
         <message>
             <source>批量修改</source>
             <translation>批量修改</translation>
-        </message>
-        <message>
-            <source>拖拽图层【{}】到该目录，请选择要执行的操作：
-
-涉及物理文件：
-{}</source>
-            <translation>拖拽图层【{}】到该目录，请选择要执行的操作：
-
-涉及物理文件：
-{}</translation>
-        </message>
-        <message>
-            <source>拖拽文件夹【{}】到该目录，请选择要执行的操作：
-
-源路径：{}
-目标目录：{}</source>
-            <translation>拖拽文件夹【{}】到该目录，请选择要执行的操作：
-
-源路径：{}
-目标目录：{}</translation>
-        </message>
-        <message>
-            <source>拖拽选中的 {} 个图层到该目录，请选择要执行的操作：
-
-涉及物理文件：
-{}</source>
-            <translation>拖拽选中的 {} 个图层到该目录，请选择要执行的操作：
-
-涉及物理文件：
-{}</translation>
         </message>
         <message>
             <source>按地图主题过滤：{}</source>
@@ -517,12 +427,6 @@
             <translation>未找到图层【{}】的源文件。</translation>
         </message>
         <message>
-            <source>未找到图层【{}】的源文件：
-{}</source>
-            <translation>未找到图层【{}】的源文件：
-{}</translation>
-        </message>
-        <message>
             <source>未找到指定的图层，无法进行文件移动。</source>
             <translation>未找到指定的图层，无法进行文件移动。</translation>
         </message>
@@ -545,50 +449,6 @@
         <message>
             <source>格式过滤:</source>
             <translation>格式过滤:</translation>
-        </message>
-        <message>
-            <source>此操作将从各自的 GeoPackage 数据库中永久删除以下图层表（共 {} 个），且无法恢复！
-
-{}
-
-确定要继续吗？</source>
-            <translation>此操作将从各自的 GeoPackage 数据库中永久删除以下图层表（共 {} 个），且无法恢复！
-
-{}
-
-确定要继续吗？</translation>
-        </message>
-        <message>
-            <source>此操作将从数据库【{}】中永久删除图层数据表【{}】，且无法恢复！
-
-确定要继续吗？</source>
-            <translation>此操作将从数据库【{}】中永久删除图层数据表【{}】，且无法恢复！
-
-确定要继续吗？</translation>
-        </message>
-        <message>
-            <source>此操作将永久删除以下物理文件（共 {} 个），且无法恢复：
-
-{}
-
-确定要继续吗？</source>
-            <translation>此操作将永久删除以下物理文件（共 {} 个），且无法恢复：
-
-{}
-
-确定要继续吗？</translation>
-        </message>
-        <message>
-            <source>此操作将永久删除以下物理文件，且无法恢复：
-
-{}
-
-确定要继续吗？</source>
-            <translation>此操作将永久删除以下物理文件，且无法恢复：
-
-{}
-
-确定要继续吗？</translation>
         </message>
         <message>
             <source>此操作将直接修改磁盘物理文件路径并更新 QGIS 数据源链接。</source>
@@ -633,32 +493,6 @@
         <message>
             <source>目标位置：</source>
             <translation>目标位置：</translation>
-        </message>
-        <message>
-            <source>目标文件夹中已存在同名文件夹或文件：
-{}</source>
-            <translation>目标文件夹中已存在同名文件夹或文件：
-{}</translation>
-        </message>
-        <message>
-            <source>目标文件夹已存在以下同名文件：
-{}
-
-操作已被取消。</source>
-            <translation>目标文件夹已存在以下同名文件：
-{}
-
-操作已被取消。</translation>
-        </message>
-        <message>
-            <source>目标文件夹已存在以下同名文件：
-{}
-
-操作已被取消，请先清理或重命名冲突文件。</source>
-            <translation>目标文件夹已存在以下同名文件：
-{}
-
-操作已被取消，请先清理或重命名冲突文件。</translation>
         </message>
         <message>
             <source>目标文件的父文件夹不存在。</source>
@@ -713,12 +547,6 @@
             <translation>移动冲突</translation>
         </message>
         <message>
-            <source>移动发生异常错误：
-{}</source>
-            <translation>移动发生异常错误：
-{}</translation>
-        </message>
-        <message>
             <source>移动失败</source>
             <translation>移动失败</translation>
         </message>
@@ -729,12 +557,6 @@
         <message>
             <source>移动文件失败: {}</source>
             <translation>移动文件失败: {}</translation>
-        </message>
-        <message>
-            <source>移动文件异常：
-{}</source>
-            <translation>移动文件异常：
-{}</translation>
         </message>
         <message>
             <source>移动选中的 1 个文件到…</source>

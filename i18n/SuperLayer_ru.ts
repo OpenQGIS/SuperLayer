@@ -127,34 +127,8 @@
             <translation>Указанный слой не найден, перемещение файлов невозможно.</translation>
         </message>
         <message>
-            <source>移动被拦截</source>
-            <translation>Перемещение перехвачено</translation>
-        </message>
-        <message>
-            <source>图层【{}】目前处于编辑状态。
-请先在 QGIS 中保存编辑并关闭编辑模式，然后再尝试移动文件。</source>
-            <translation>Слой [{}] находится в режиме редактирования.
-Сохраните изменения и закройте режим редактирования в QGIS перед перемещением файлов.</translation>
-        </message>
-        <message>
-            <source>未找到图层【{}】的源文件：
-{}</source>
-            <translation>Исходный файл для слоя [{}] не найден:
-{}</translation>
-        </message>
-        <message>
             <source>移动冲突</source>
             <translation>Конфликт перемещения</translation>
-        </message>
-        <message>
-            <source>目标文件夹已存在以下同名文件：
-{}
-
-操作已被取消，请先清理或重命名冲突文件。</source>
-            <translation>Целевая папка уже содержит файлы с такими же именами:
-{}
-
-Операция отменена. Очистите или переименуйте конфликтующие файлы.</translation>
         </message>
         <message>
             <source>(总大小: {})</source>
@@ -189,18 +163,8 @@
             <translation>Перемещение успешно</translation>
         </message>
         <message>
-            <source>图层【{}】的文件已成功移动到新目录。</source>
-            <translation>Файлы слоя [{}] успешно перемещены в новый каталог.</translation>
-        </message>
-        <message>
             <source>在拷贝或移动图层【{}】文件时发生未知错误。</source>
             <translation>Произошла неизвестная ошибка при копировании или перемещении файлов слоя [{}].</translation>
-        </message>
-        <message>
-            <source>物理移动文件发生异常错误：
-{}</source>
-            <translation>Произошла исключительная ошибка при физическом перемещении:
-{}</translation>
         </message>
         <message>
             <source>移动选中的 1 个文件到…</source>
@@ -233,14 +197,6 @@
         <message>
             <source>开始编辑</source>
             <translation>Начать редактирование</translation>
-        </message>
-        <message>
-            <source>重命名图层名</source>
-            <translation>Переименовать имя слоя</translation>
-        </message>
-        <message>
-            <source>重命名原始文件名</source>
-            <translation>Переименовать имя исходного файла</translation>
         </message>
         <message>
             <source>打开属性表</source>
@@ -399,26 +355,8 @@
             <translation>Подтверждение удаления файла</translation>
         </message>
         <message>
-            <source>此操作将永久删除以下物理文件，且无法恢复：
-
-{}
-
-确定要继续吗？</source>
-            <translation>Это действие навсегда удалит физические файлы и не может быть отменено:
-
-{}
-
-Продолжить?</translation>
-        </message>
-        <message>
             <source>部分文件删除失败</source>
             <translation>Некоторые файлы не удалось удалить</translation>
-        </message>
-        <message>
-            <source>以下文件未能删除：
-</source>
-            <translation>Следующие файлы не были удалены:
-</translation>
         </message>
         <message>
             <source>重命名父文件夹名</source>
@@ -427,18 +365,6 @@
         <message>
             <source>确认删除多个文件</source>
             <translation>Подтверждение удаления нескольких файлов</translation>
-        </message>
-        <message>
-            <source>此操作将永久删除以下物理文件（共 {} 个），且无法恢复：
-
-{}
-
-确定要继续吗？</source>
-            <translation>Это действие навсегда удалит следующие физические файлы (всего {}), возврата нет:
-
-{}
-
-Вы уверены, что хотите продолжить?</translation>
         </message>
         <message>
             <source>删除选中的 {} 个图层</source>
@@ -489,14 +415,6 @@
             <translation>Подтверждение удаления слоя в базе данных</translation>
         </message>
         <message>
-            <source>此操作将从数据库【{}】中永久删除图层数据表【{}】，且无法恢复！
-
-确定要继续吗？</source>
-            <translation>Это действие навсегда удалит таблицу слоя 【{}】 из базы данных 【{}】 и не сможет быть отменено!
-
-Вы уверены, что хотите продолжить?</translation>
-        </message>
-        <message>
             <source>已成功从数据库中删除图层表【{}】。</source>
             <translation>Таблица слоя 【{}】 успешно удалена из базы данных.</translation>
         </message>
@@ -517,26 +435,8 @@
             <translation>Удалить выбранные {} слоев внутри базы данных</translation>
         </message>
         <message>
-            <source>此操作将从各自的 GeoPackage 数据库中永久删除以下图层表（共 {} 个），且无法恢复！
-
-{}
-
-确定要继续吗？</source>
-            <translation>Это действие навсегда удалит следующие таблицы слоев (всего {}) из соответствующих баз данных GeoPackage и не может быть отменено!
-
-{}
-
-Вы уверены, что хотите продолжить?</translation>
-        </message>
-        <message>
             <source>部分图层删除失败</source>
             <translation>Не удалось удалить некоторые слои</translation>
-        </message>
-        <message>
-            <source>以下数据库内图层未能成功删除：
-</source>
-            <translation>Следующие слои в базе данных не удалось удалить:
-</translation>
         </message>
         <message>
             <source>选中的 {} 个数据库内图层已成功删除。</source>
@@ -571,16 +471,6 @@
             <translation>Переименовать файл</translation>
         </message>
         <message>
-            <source>
-
-关联的图层：
-{}</source>
-            <translation>
-
-Related layers:
-{}</translation>
-        </message>
-        <message>
             <source>QGIS 地图主题</source>
             <translation>QGIS Map Themes</translation>
         </message>
@@ -591,12 +481,6 @@ Related layers:
         <message>
             <source>不能将文件夹移动到自身或其子文件夹下。</source>
             <translation>A folder cannot be moved into itself or one of its subfolders.</translation>
-        </message>
-        <message>
-            <source>以下图层处于编辑状态，请保存并关闭编辑模式后再尝试操作：
-{}</source>
-            <translation>The following layers are being edited. Save them and stop editing before trying again:
-{}</translation>
         </message>
         <message>
             <source>保存临时图层</source>
@@ -671,12 +555,6 @@ Related layers:
             <translation>The physical files for layer [{}] were backed up to the destination folder.</translation>
         </message>
         <message>
-            <source>图层【{}】目前处于编辑状态。
-请先在 QGIS 中保存编辑并关闭编辑模式，然后再尝试操作。</source>
-            <translation>Layer [{}] is currently being edited.
-Save the edits and stop editing in QGIS before trying again.</translation>
-        </message>
-        <message>
             <source>图层已失效</source>
             <translation>Layer Is No Longer Available</translation>
         </message>
@@ -697,12 +575,6 @@ Save the edits and stop editing in QGIS before trying again.</translation>
             <translation>Backup Conflict</translation>
         </message>
         <message>
-            <source>备份发生异常错误：
-{}</source>
-            <translation>An unexpected backup error occurred:
-{}</translation>
-        </message>
-        <message>
             <source>备份失败</source>
             <translation>Backup Failed</translation>
         </message>
@@ -717,12 +589,6 @@ Save the edits and stop editing in QGIS before trying again.</translation>
         <message>
             <source>复制冲突</source>
             <translation>Copy Conflict</translation>
-        </message>
-        <message>
-            <source>复制发生异常错误：
-{}</source>
-            <translation>An unexpected copy error occurred:
-{}</translation>
         </message>
         <message>
             <source>复制图层失败: {}</source>
@@ -757,20 +623,6 @@ Save the edits and stop editing in QGIS before trying again.</translation>
             <translation>Moved the files of {} layers to the new folder.</translation>
         </message>
         <message>
-            <source>成功移动了 {} 个图层，但以下图层移动失败：
-{}</source>
-            <translation>Moved {} layers, but the following layers failed:
-{}</translation>
-        </message>
-        <message>
-            <source>成功：{} 个
-跳过：{} 个
-失败：{} 个</source>
-            <translation>Succeeded: {}
-Skipped: {}
-Failed: {}</translation>
-        </message>
-        <message>
             <source>所有勾选图层将作为独立图层写入同一个容器。</source>
             <translation>All checked layers will be written as separate layers in the same container.</translation>
         </message>
@@ -785,36 +637,6 @@ Failed: {}</translation>
         <message>
             <source>批量保存完成</source>
             <translation>Batch Save Complete</translation>
-        </message>
-        <message>
-            <source>拖拽图层【{}】到该目录，请选择要执行的操作：
-
-涉及物理文件：
-{}</source>
-            <translation>Layer [{}] was dragged to this folder. Choose an operation:
-
-Physical files involved:
-{}</translation>
-        </message>
-        <message>
-            <source>拖拽文件夹【{}】到该目录，请选择要执行的操作：
-
-源路径：{}
-目标目录：{}</source>
-            <translation>Folder [{}] was dragged here. Choose an operation:
-
-Source: {}
-Destination: {}</translation>
-        </message>
-        <message>
-            <source>拖拽选中的 {} 个图层到该目录，请选择要执行的操作：
-
-涉及物理文件：
-{}</source>
-            <translation>{} selected layers were dragged to this folder. Choose an operation:
-
-Physical files involved:
-{}</translation>
         </message>
         <message>
             <source>按地图主题过滤：{}</source>
@@ -893,22 +715,6 @@ Physical files involved:
             <translation>Destination:</translation>
         </message>
         <message>
-            <source>目标文件夹中已存在同名文件夹或文件：
-{}</source>
-            <translation>A folder or file with the same name already exists in the destination:
-{}</translation>
-        </message>
-        <message>
-            <source>目标文件夹已存在以下同名文件：
-{}
-
-操作已被取消。</source>
-            <translation>The following files already exist in the destination folder:
-{}
-
-The operation was canceled.</translation>
-        </message>
-        <message>
             <source>目标文件的父文件夹不存在。</source>
             <translation>The destination file's parent folder does not exist.</translation>
         </message>
@@ -927,18 +733,6 @@ The operation was canceled.</translation>
         <message>
             <source>移动</source>
             <translation>Move</translation>
-        </message>
-        <message>
-            <source>移动发生异常错误：
-{}</source>
-            <translation>An unexpected move error occurred:
-{}</translation>
-        </message>
-        <message>
-            <source>移动文件异常：
-{}</source>
-            <translation>An error occurred while moving files:
-{}</translation>
         </message>
         <message>
             <source>缩放到…</source>
@@ -1164,18 +958,6 @@ The operation was canceled.</translation>
             <translation>Подтверждение удаления нескольких файлов</translation>
         </message>
         <message>
-            <source>此操作将永久删除以下物理文件（共 {} 个），且无法恢复：
-
-{}
-
-确定要继续吗？</source>
-            <translation>Это действие навсегда удалит следующие физические файлы (всего {}), возврата нет:
-
-{}
-
-Вы уверены, что хотите продолжить?</translation>
-        </message>
-        <message>
             <source>删除选中的 {} 个图层</source>
             <translation>Удалить выбранные {} слоев</translation>
         </message>
@@ -1228,14 +1010,6 @@ The operation was canceled.</translation>
             <translation>Подтверждение удаления слоя в базе данных</translation>
         </message>
         <message>
-            <source>此操作将从数据库【{}】中永久删除图层数据表【{}】，且无法恢复！
-
-确定要继续吗？</source>
-            <translation>Это действие навсегда удалит таблицу слоя 【{}】 из базы данных 【{}】 и не сможет быть отменено!
-
-Вы уверены, что хотите продолжить?</translation>
-        </message>
-        <message>
             <source>已成功从数据库中删除图层表【{}】。</source>
             <translation>Таблица слоя 【{}】 успешно удалена из базы данных.</translation>
         </message>
@@ -1256,26 +1030,8 @@ The operation was canceled.</translation>
             <translation>Удалить выбранные {} слоев внутри базы данных</translation>
         </message>
         <message>
-            <source>此操作将从各自的 GeoPackage 数据库中永久删除以下图层表（共 {} 个），且无法恢复！
-
-{}
-
-确定要继续吗？</source>
-            <translation>Это действие навсегда удалит следующие таблицы слоев (всего {}) из соответствующих баз данных GeoPackage и не может быть отменено!
-
-{}
-
-Вы уверены, что хотите продолжить?</translation>
-        </message>
-        <message>
             <source>部分图层删除失败</source>
             <translation>Не удалось удалить некоторые слои</translation>
-        </message>
-        <message>
-            <source>以下数据库内图层未能成功删除：
-</source>
-            <translation>Следующие слои в базе данных не удалось удалить:
-</translation>
         </message>
         <message>
             <source>选中的 {} 个数据库内图层已成功删除。</source>

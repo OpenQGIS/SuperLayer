@@ -1,3 +1,12 @@
+import os
+import sys
+# Ensure parent directory is on sys.path and mocks are loaded
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try:
+    from .mock_qgis import setup_qgis_mocks
+except ImportError:
+    from mock_qgis import setup_qgis_mocks
+setup_qgis_mocks()
 import unittest
 from unittest.mock import MagicMock, patch
 import sys
