@@ -118,8 +118,10 @@ def _qt_immediate_delete(obj):
 
 try:
     from .dock_widget import SuperLayerDockWidget
+    from .file_operations import resume_pending_rename_cleanup
 except ImportError:
     from dock_widget import SuperLayerDockWidget
+    from file_operations import resume_pending_rename_cleanup
 
 class SuperLayerPlugin:
     """SuperLayer QGIS Plugin integration class."""
@@ -160,6 +162,8 @@ class SuperLayerPlugin:
                 break
 
     def initGui(self):
+        # Resume fingerprint-protected cleanup without blocking QGIS startup.
+        resume_pending_rename_cleanup()
         # Create action
         icon_path = os.path.join(os.path.dirname(__file__), 'icons', 'SuperLayer.svg')
         if os.path.exists(icon_path):

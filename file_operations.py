@@ -1,8 +1,11 @@
 import os
 import shutil
+import hashlib
+import json
+import logging
 
 try:
-    from qgis.core import QgsMapLayer, QgsVectorLayer, QgsRasterLayer
+    from qgis.core import QgsMapLayer, QgsVectorLayer, QgsRasterLayer, QgsSettings
 except ImportError:
     # Fallback/Mock classes for environment without QGIS (like CLI test environment)
     class QgsMapLayer:
@@ -11,6 +14,152 @@ except ImportError:
         pass
     class QgsRasterLayer(QgsMapLayer):
         pass
+    QgsSettings = None
+
+try:
+    from qgis.PyQt.QtCore import QCoreApplication, QTimer
+except ImportError:
+    QCoreApplication = None
+    QTimer = None
+
+
+_CLEANUP_SETTINGS_KEY = "SuperLayer/pendingRenameCleanupV1"
+_cleanup_jobs = []
+_cleanup_timer = None
+_cleanup_loaded = False
+
+
+def _file_fingerprint(path):
+    """Return a stable identity used to prevent deferred deletion of a new file."""
+    stat = os.stat(path)
+    digest = hashlib.sha256()
+    with open(path, "rb") as stream:
+        digest.update(stream.read(65536))
+        if stat.st_size > 65536:
+            stream.seek(max(0, stat.st_size - 65536))
+            digest.update(stream.read(65536))
+    return {"size": stat.st_size, "mtime_ns": stat.st_mtime_ns, "digest": digest.hexdigest()}
+
+
+def _fingerprint_matches(path, expected):
+    try:
+        return _file_fingerprint(path) == expected
+    except OSError:
+        return False
+
+
+def _load_cleanup_jobs():
+    global _cleanup_loaded, _cleanup_jobs
+    if _cleanup_loaded:
+        return
+    _cleanup_loaded = True
+    if QgsSettings is None:
+        return
+    try:
+        raw = QgsSettings().value(_CLEANUP_SETTINGS_KEY, "")
+        loaded = json.loads(str(raw)) if raw else []
+        if isinstance(loaded, list):
+            _cleanup_jobs = [job for job in loaded if isinstance(job, dict)]
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Unable to load pending rename cleanup: %s", exc)
+
+
+def _persist_cleanup_jobs():
+    if QgsSettings is None:
+        return
+    try:
+        settings = QgsSettings()
+        if _cleanup_jobs:
+            settings.setValue(_CLEANUP_SETTINGS_KEY, json.dumps(_cleanup_jobs, ensure_ascii=False))
+        else:
+            settings.remove(_CLEANUP_SETTINGS_KEY)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Unable to persist pending rename cleanup: %s", exc)
+
+
+def _process_cleanup_jobs():
+    """Attempt one non-blocking cleanup pass and retain locked files for retry."""
+    global _cleanup_jobs
+    remaining_jobs = []
+    for job in _cleanup_jobs:
+        remaining_files = []
+        for item in job.get("files", []):
+            path = item.get("path", "")
+            if not path or not os.path.exists(path):
+                continue
+            if not _fingerprint_matches(path, item.get("fingerprint", {})):
+                logging.getLogger(__name__).warning(
+                    "Skipped deferred deletion because the file changed: %s", path
+                )
+                continue
+            try:
+                os.remove(path)
+            except OSError:
+                remaining_files.append(item)
+        if remaining_files:
+            job["files"] = remaining_files
+            job["attempts"] = int(job.get("attempts", 0)) + 1
+            remaining_jobs.append(job)
+    _cleanup_jobs = remaining_jobs
+    _persist_cleanup_jobs()
+    return bool(_cleanup_jobs)
+
+
+def _on_cleanup_timeout():
+    pending = _process_cleanup_jobs()
+    if not pending or all(int(job.get("attempts", 0)) >= 60 for job in _cleanup_jobs):
+        if _cleanup_timer is not None:
+            _cleanup_timer.stop()
+        if pending:
+            logging.getLogger(__name__).warning(
+                "Some renamed source files remain locked and will be retried next time SuperLayer starts"
+            )
+
+
+def _schedule_cleanup():
+    global _cleanup_timer
+    if not _cleanup_jobs or QTimer is None or QCoreApplication is None:
+        return
+    try:
+        if QCoreApplication.instance() is None:
+            return
+        if _cleanup_timer is None:
+            _cleanup_timer = QTimer()
+            _cleanup_timer.setInterval(500)
+            _cleanup_timer.timeout.connect(_on_cleanup_timeout)
+        if not _cleanup_timer.isActive():
+            _cleanup_timer.start()
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Unable to start deferred rename cleanup: %s", exc)
+
+
+def resume_pending_rename_cleanup():
+    """Resume fingerprint-protected cleanup saved by an earlier QGIS session."""
+    _load_cleanup_jobs()
+    for job in _cleanup_jobs:
+        job["attempts"] = 0
+    _process_cleanup_jobs()
+    _schedule_cleanup()
+
+
+def pending_rename_cleanup_files():
+    """Return old files still awaiting release by Windows/QGIS."""
+    _load_cleanup_jobs()
+    return [item.get("path") for job in _cleanup_jobs for item in job.get("files", [])]
+
+
+def _enqueue_rename_cleanup(paths):
+    _load_cleanup_jobs()
+    items = []
+    for path in paths:
+        if os.path.exists(path):
+            items.append({"path": os.path.abspath(path), "fingerprint": _file_fingerprint(path)})
+    if not items:
+        return
+    _cleanup_jobs.append({"files": items, "attempts": 0})
+    _persist_cleanup_jobs()
+    _process_cleanup_jobs()
+    _schedule_cleanup()
 
 def split_qgis_source(source_path):
     if not source_path:
@@ -196,6 +345,8 @@ def safe_rename(layer, new_filename):
     actual_path = resolve_physical_path(phys_source_path)
     if not actual_path or not os.path.exists(actual_path):
         return False
+    if hasattr(layer, 'isEditable') and layer.isEditable():
+        raise RuntimeError("Cannot rename a layer while it is being edited")
     dir_path = os.path.dirname(phys_source_path)
     _, old_ext = os.path.splitext(phys_source_path)
     new_base_name, _ = os.path.splitext(new_filename)
@@ -230,6 +381,7 @@ def safe_rename(layer, new_filename):
             raise FileExistsError(f"Destination file already exists: {dest}")
             
     copied_files = []
+    source_updated = False
     # Copy files first to avoid Windows file lock WinError 32
     try:
         for src, dest in rename_mapping:
@@ -240,16 +392,20 @@ def safe_rename(layer, new_filename):
         for _, dest in copied_files:
             if not os.path.exists(dest):
                 raise FileNotFoundError(f"Failed to copy file: {dest}")
+        for src, dest in copied_files:
+            if _file_fingerprint(src) != _file_fingerprint(dest):
+                raise IOError(f"Copied file verification failed: {dest}")
 
         # Update layer source path in QGIS
         new_source_path = new_phys_source_path + query_params
         update_layer_source(layer, new_source_path)
+        source_updated = True
         
         # Update layer name to match the new file name (without extension)
         if hasattr(layer, 'setName'):
             layer.setName(new_base_name)
         
-        # Process pending Qt events to force destruction of the old data provider (deferred delete)
+        # Give Qt a chance to retire the old provider, without blocking its event loop.
         try:
             from qgis.PyQt.QtCore import QCoreApplication
             QCoreApplication.processEvents()
@@ -268,35 +424,23 @@ def safe_rename(layer, new_filename):
                     except ImportError:
                         pass
 
-        # Force garbage collection to release any Python-side wrappers
+        # Force garbage collection to release any Python-side wrappers.
         import gc
         gc.collect()
-        
-        # Now that datasource is swapped, delete original files with a retry loop for Windows locks
-        import time
-        for src, _ in copied_files:
-            deleted = False
-            for attempt in range(20):  # Try for up to 1 second
-                try:
-                    if os.path.exists(src):
-                        os.remove(src)
-                    deleted = True
-                    break
-                except Exception:
-                    gc.collect()
-                    time.sleep(0.05)
-            if not deleted:
-                import logging
-                logging.getLogger(__name__).error("Failed to remove renamed source file %s after multiple attempts", src)
+
+        # Delete unlocked files now; retry locked files asynchronously and across restarts.
+        _enqueue_rename_cleanup([src for src, _ in copied_files])
     except Exception as e:
-        # Rollback copied files if error occurs before datasource update
-        for _, dest in copied_files:
-            try:
-                if os.path.exists(dest):
-                    os.remove(dest)
-            except Exception as e:  # noqa: BLE001
-                import logging
-                logging.getLogger(__name__).error("Failed to rollback copied destination file %s: %s", dest, e)
+        # Never remove the active destination after the layer has switched to it.
+        if not source_updated:
+            for _, dest in copied_files:
+                try:
+                    if os.path.exists(dest):
+                        os.remove(dest)
+                except Exception as rollback_error:
+                    logging.getLogger(__name__).error(
+                        "Failed to rollback copied destination file %s: %s", dest, rollback_error
+                    )
         raise e
         
     return True
@@ -331,29 +475,29 @@ def safe_rename_dir(source_dir, new_dir_name, additional_layers=None):
     seen_layers = set()
     
     if additional_layers:
-        for l in additional_layers:
-            if l and l.source():
-                p_path, q_params = split_qgis_source(l.source())
-                layers_to_update.append((l, p_path, q_params))
-                seen_layers.add(l)
+        for layer in additional_layers:
+            if layer and layer.source():
+                p_path, q_params = split_qgis_source(layer.source())
+                layers_to_update.append((layer, p_path, q_params))
+                seen_layers.add(layer)
                 
-    for l_id, l in project.mapLayers().items():
-        if l and l not in seen_layers and l.source():
-            p_path, q_params = split_qgis_source(l.source())
+    for layer_id, layer in project.mapLayers().items():
+        if layer and layer not in seen_layers and layer.source():
+            p_path, q_params = split_qgis_source(layer.source())
             l_dir = os.path.dirname(p_path)
             if os.path.normcase(os.path.abspath(l_dir)) == os.path.normcase(os.path.abspath(source_dir)):
-                layers_to_update.append((l, p_path, q_params))
-                seen_layers.add(l)
+                layers_to_update.append((layer, p_path, q_params))
+                seen_layers.add(layer)
                 
     # Copy directory contents recursively to avoid Windows file locks on move
     shutil.copytree(source_dir, new_source_dir)
     
     try:
         # Update QGIS layer sources to point to new directory
-        for l, p_path, q_params in layers_to_update:
+        for layer, p_path, q_params in layers_to_update:
             filename = os.path.basename(p_path)
             new_l_path = os.path.join(new_source_dir, filename).replace('\\', '/') + q_params
-            update_layer_source(l, new_l_path)
+            update_layer_source(layer, new_l_path)
             
         # Process pending Qt events to force destruction of old providers
         try:
@@ -448,11 +592,11 @@ def safe_migrate_dir(source_path, target_parent_dir, additional_layers=None):
     seen_layers = set()
     
     if additional_layers:
-        for l in additional_layers:
-            if l and l.source():
-                p_path, q_params = split_qgis_source(l.source())
-                layers_to_update.append((l, p_path, q_params))
-                seen_layers.add(l)
+        for layer in additional_layers:
+            if layer and layer.source():
+                p_path, q_params = split_qgis_source(layer.source())
+                layers_to_update.append((layer, p_path, q_params))
+                seen_layers.add(layer)
                 
     # Helper to check if a path is under source_path (or is source_path itself)
     def is_under_or_equal(path, parent):
@@ -460,13 +604,13 @@ def safe_migrate_dir(source_path, target_parent_dir, additional_layers=None):
         norm_parent = os.path.normcase(os.path.abspath(parent))
         return norm_p == norm_parent or norm_p.startswith(norm_parent + os.sep) or norm_p.replace('\\', '/').startswith(norm_parent.replace('\\', '/') + '/')
 
-    for l_id, l in project.mapLayers().items():
-        if l and l not in seen_layers and l.source():
-            p_path, q_params = split_qgis_source(l.source())
+    for layer_id, layer in project.mapLayers().items():
+        if layer and layer not in seen_layers and layer.source():
+            p_path, q_params = split_qgis_source(layer.source())
             actual_p_path = resolve_physical_path(p_path)
             if is_under_or_equal(actual_p_path, source_path):
-                layers_to_update.append((l, p_path, q_params))
-                seen_layers.add(l)
+                layers_to_update.append((layer, p_path, q_params))
+                seen_layers.add(layer)
                 
     # Copy the directory or file
     if os.path.isdir(source_path):
@@ -490,13 +634,13 @@ def safe_migrate_dir(source_path, target_parent_dir, additional_layers=None):
         
     try:
         # Update QGIS layer sources
-        for l, p_path, q_params in layers_to_update:
+        for layer, p_path, q_params in layers_to_update:
             if os.path.isdir(source_path):
                 rel_path = os.path.relpath(p_path, source_path)
                 new_l_path = os.path.normpath(os.path.join(new_path, rel_path)).replace('\\', '/') + q_params
             else:
                 new_l_path = new_path + q_params
-            update_layer_source(l, new_l_path)
+            update_layer_source(layer, new_l_path)
             
         # Process pending Qt events to force destruction of old providers
         try:

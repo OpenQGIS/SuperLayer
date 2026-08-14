@@ -771,15 +771,24 @@ class FolderItem(QStandardItem):
         icon if the group is not effectively visible on the map canvas.
     """
     def __init__(self, folder_path, is_physical=True, group_node=None):
+        special_names = {
+            "在线图层": tr("在线图层"),
+            "虚拟图层": tr("虚拟图层"),
+            "临时图层": tr("临时图层"),
+            "不可用图层": tr("不可用图层"),
+            "内存与临时图层": tr("内存与临时图层"),
+            "无效图层": tr("无效图层"),
+        }
         if not folder_path:
             display_name = tr("根目录")
-        elif folder_path in ["在线图层", "虚拟图层", "临时图层", "不可用图层", "内存与临时图层", "无效图层"]:
-            display_name = tr(folder_path)
+        elif folder_path in special_names:
+            display_name = special_names[folder_path]
         else:
             display_name = os.path.basename(folder_path)
         super().__init__(display_name)
         self.folder_path = folder_path
         self.is_physical = is_physical
+        self.group_node = group_node
         self.setData(folder_path, Qt.ItemDataRole.UserRole)
 
         # Load base icon, then optionally overlay the hidden-folder icon
@@ -859,7 +868,16 @@ class LayerTreeModel(QStandardItemModel):
         super().__init__(parent)
         self.setHorizontalHeaderLabels([tr("图层"), tr("文件大小"), tr("物理路径")])
 
-    def rebuild_model(self, group_by_physical=True, filter_format=None, filter_visible=False):
+    def canDropMimeData(self, data, action, row, column, parent):
+        if data and hasattr(data, 'hasFormat') and data.hasFormat("application/x-superlayer-group-reorder"):
+            return True
+        try:
+            return super().canDropMimeData(data, action, row, column, parent)
+        except AttributeError:
+            return False
+
+    def rebuild_model(self, group_by_physical=True, filter_format=None, filter_visible=False,
+                      filter_layer_ids=None):
         """Clears and rebuilds the model hierarchy from the current QgsProject."""
         self.clear()
         self.setHorizontalHeaderLabels([tr("图层"), tr("文件大小"), tr("物理路径")])
@@ -869,14 +887,16 @@ class LayerTreeModel(QStandardItemModel):
             return
 
         layers = list(project.mapLayers().values())
+        if filter_layer_ids is not None:
+            layers = [layer for layer in layers if layer.id() in filter_layer_ids]
         if filter_format:
             if filter_format == "不可用图层":
-                layers = [l for l in layers if hasattr(l, 'isValid') and not l.isValid()]
+                layers = [layer for layer in layers if hasattr(layer, 'isValid') and not layer.isValid()]
             else:
-                layers = [l for l in layers if get_layer_format(l) == filter_format]
+                layers = [layer for layer in layers if get_layer_format(layer) == filter_format]
 
         if filter_visible:
-            layers = [l for l in layers if is_layer_effectively_visible(l)]
+            layers = [layer for layer in layers if is_layer_effectively_visible(layer)]
 
         if group_by_physical:
             self._build_physical_tree(layers)

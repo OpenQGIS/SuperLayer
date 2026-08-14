@@ -209,9 +209,14 @@ except ImportError:
 
 class TreeMapNode:
     """Class representing a node in the treemap, binding a QGIS layer and its physical layout rectangle."""
-    def __init__(self, layer, size, path):
+    def __init__(self, layer, size, path, physical_size=None, reference_count=1):
         self.layer = layer
-        self.size = size  # File size in bytes
+        # ``size`` is the layout weight. When several layers reference the
+        # same physical dataset, its real size is divided between the layer
+        # nodes so that the dataset is counted only once by the treemap.
+        self.size = size
+        self.physical_size = size if physical_size is None else physical_size
+        self.reference_count = reference_count
         self.path = path
         self.rect = QRectF()  # Assigned coordinate box during layout
 
@@ -312,8 +317,9 @@ class TreeMapWidget(QWidget):
         self.normal_pen = QPen(self.normal_border_color, 1)
 
     def set_layers(self, layers):
-        """Calculates size, filters invalid layers, sorts descending, and updates treemap layout."""
+        """Build one visual layer node per reference without double-counting files."""
         self.nodes = []
+        datasets = {}
         for layer in layers:
             if not layer or not layer.isValid():
                 continue
@@ -326,7 +332,29 @@ class TreeMapWidget(QWidget):
                 except Exception:
                     size = 0
                 if size > 0:
-                    self.nodes.append(TreeMapNode(layer, size, phys_path))
+                    # QGIS source parameters have already been stripped from
+                    # phys_path. realpath + normcase also folds equivalent
+                    # Windows paths with different spelling or letter case.
+                    dataset_key = os.path.normcase(os.path.realpath(actual_path))
+                    if dataset_key not in datasets:
+                        datasets[dataset_key] = {
+                            "path": phys_path,
+                            "size": size,
+                            "layers": [],
+                        }
+                    datasets[dataset_key]["layers"].append(layer)
+
+        for dataset in datasets.values():
+            reference_count = len(dataset["layers"])
+            layout_size = dataset["size"] / reference_count
+            for layer in dataset["layers"]:
+                self.nodes.append(TreeMapNode(
+                    layer,
+                    layout_size,
+                    dataset["path"],
+                    physical_size=dataset["size"],
+                    reference_count=reference_count,
+                ))
         # Sort nodes descending by size
         self.nodes.sort(key=lambda x: x.size, reverse=True)
         self.update_layout()
@@ -442,9 +470,9 @@ class TreeMapWidget(QWidget):
                 try:
                     from layer_model import get_layer_format, get_format_color_dict, is_layer_effectively_visible
                 except ImportError:
-                    def get_layer_format(l): return "other"
+                    def get_layer_format(layer): return "other"
                     def get_format_color_dict(f): return {"treemap": "#9e9e9e"}
-                    def is_layer_effectively_visible(l): return True
+                    def is_layer_effectively_visible(layer): return True
                     
             fmt = get_layer_format(node.layer)
             colors_dict = get_format_color_dict(fmt)
@@ -500,7 +528,9 @@ class TreeMapWidget(QWidget):
                 
             if w > 15 and h >= lh:
                 painter.setPen(self.text_color)
-                size_str = format_size(node.size)
+                size_str = format_size(node.physical_size)
+                if node.reference_count > 1:
+                    size_str += " · " + tr("共享×{}").format(node.reference_count)
                 lines = format_treemap_text(node.layer.name(), size_str, w, h, fm)
                 if lines:
                     text = "\n".join(lines)
@@ -532,8 +562,13 @@ class TreeMapWidget(QWidget):
                         global_pos = event.globalPosition().toPoint()
                     except AttributeError:
                         global_pos = QPoint(0, 0)
-                size_str = format_size(found.size)
-                QToolTip.showText(global_pos, f"{found.layer.name()}\n" + tr("大小: {}").format(size_str) + "\n" + tr("路径: {}").format(found.path), self)
+                size_str = format_size(found.physical_size)
+                details = f"{found.layer.name()}\n" + tr("物理文件大小: {}").format(size_str)
+                if found.reference_count > 1:
+                    details += "\n" + tr("共享此文件的图层: {} 个").format(found.reference_count)
+                    details += "\n" + tr("矩形面积按引用数平均分配，不重复计算")
+                details += "\n" + tr("路径: {}").format(found.path)
+                QToolTip.showText(global_pos, details, self)
             else:
                 QToolTip.hideText()
 

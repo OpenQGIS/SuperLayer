@@ -4,26 +4,26 @@ import sys
 
 # Robust fallback imports for Qt
 try:
-    from qgis.PyQt.QtCore import Qt, QModelIndex, QTimer
-    from qgis.PyQt.QtWidgets import (QAction, QToolBar, QStackedWidget, QListView, 
+    from qgis.PyQt.QtCore import Qt, QModelIndex, QPersistentModelIndex, QTimer
+    from qgis.PyQt.QtWidgets import (QAction, QToolBar, QStackedWidget, QListView,
                                  QTreeView, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QMenu, QFileDialog, QInputDialog,
                                  QAbstractItemView, QMessageBox, QActionGroup, QHeaderView, QSizePolicy, QDialog, QToolButton)
 except ImportError:
     try:
-        from qtpy.QtCore import Qt, QModelIndex, QTimer
-        from qtpy.QtWidgets import (QAction, QToolBar, QStackedWidget, QListView, 
+        from qtpy.QtCore import Qt, QModelIndex, QPersistentModelIndex, QTimer
+        from qtpy.QtWidgets import (QAction, QToolBar, QStackedWidget, QListView,
                                     QTreeView, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QMenu, QFileDialog, QInputDialog,
                                     QAbstractItemView, QMessageBox, QActionGroup, QHeaderView, QSizePolicy, QDialog, QToolButton)
     except ImportError:
         try:
-            from PySide2.QtCore import Qt, QModelIndex, QTimer
-            from PySide2.QtWidgets import (QAction, QToolBar, QStackedWidget, QListView, 
+            from PySide2.QtCore import Qt, QModelIndex, QPersistentModelIndex, QTimer
+            from PySide2.QtWidgets import (QAction, QToolBar, QStackedWidget, QListView,
                                            QTreeView, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QMenu, QFileDialog, QInputDialog,
                                            QAbstractItemView, QMessageBox, QActionGroup, QHeaderView, QSizePolicy, QDialog, QToolButton)
         except ImportError:
             try:
-                from PySide6.QtCore import Qt, QModelIndex, QTimer
-                from PySide6.QtWidgets import (QToolBar, QStackedWidget, QListView, 
+                from PySide6.QtCore import Qt, QModelIndex, QPersistentModelIndex, QTimer
+                from PySide6.QtWidgets import (QToolBar, QStackedWidget, QListView,
                                                QTreeView, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QMenu, QFileDialog, QInputDialog,
                                                QAbstractItemView, QMessageBox, QHeaderView, QSizePolicy, QDialog, QToolButton)
                 from PySide6.QtGui import QAction, QActionGroup
@@ -67,6 +67,8 @@ except ImportError:
                         LeftButton = 1
                         RightButton = 2
                         MiddleButton = 4
+                    class DropAction:
+                        MoveAction = 2
                 class QHeaderView:
                     Interactive = 0
                     ResizeToContents = 1
@@ -83,12 +85,13 @@ except ImportError:
                         Expanding = 2
                 class QModelIndex:
                     pass
+                QPersistentModelIndex = QModelIndex
                 class QAction:
                     def __init__(self, *args, **kwargs):
                         self._icon = kwargs.get('icon', None)
                         self._text = kwargs.get('text', "")
                         self.parent = kwargs.get('parent', None)
-                        
+
                         # Map remaining unassigned positional args to standard QAction signatures
                         if len(args) == 1:
                             if isinstance(args[0], str):
@@ -102,7 +105,7 @@ except ImportError:
                             self._icon = args[0]
                             self._text = args[1]
                             self.parent = args[2]
-                            
+
                         self._checkable = False
                         self._checked = False
                         self.triggered = self._Signal()
@@ -126,6 +129,12 @@ except ImportError:
                         return self._text
                     def setIcon(self, icon):
                         self._icon = icon
+                    def setEnabled(self, val):
+                        self._enabled = bool(val)
+                    def isEnabled(self):
+                        return getattr(self, '_enabled', True)
+                    def setVisible(self, val):
+                        self._visible = bool(val)
                 class QActionGroup:
                     def __init__(self, parent=None):
                         self._actions = []
@@ -462,6 +471,7 @@ try:
     from qgis.core import (
         QgsMapLayer,
         QgsMapLayerStyle,
+        QgsLayerTreeModel,
         QgsProject,
         QgsRasterLayer,
         QgsVectorFileWriter,
@@ -480,7 +490,7 @@ except ImportError:
             self._widget = widget
         def show(self):
             pass
-            
+
     class QgsProject:
         _instance = None
         @classmethod
@@ -506,7 +516,21 @@ except ImportError:
                 self.removeMapLayer(layer_id)
         def transformContext(self):
             return None
-            
+
+    class QgsLayerTreeModel:
+        class Flag:
+            AllowNodeReorder = 1
+        def __init__(self, root):
+            self.root = root
+        def setFlag(self, flag, enabled=True):
+            pass
+        def node2index(self, node):
+            return QModelIndex()
+        def mimeData(self, indexes):
+            return None
+        def dropMimeData(self, data, action, row, column, parent):
+            return False
+
     class QgsMapLayer:
         def __init__(self, layer_id="", name="", source_path="", provider=""):
             self._id = layer_id
@@ -528,10 +552,16 @@ except ImportError:
         def setName(self, name): self._name = name
         def triggerRepaint(self): pass
         def dataProvider(self): return self._provider
-        
+
     class QgsVectorLayer(QgsMapLayer):
         def __init__(self, path, name, provider):
             super().__init__(name, name, path, provider)
+            self._subset_string = ""
+        def subsetString(self):
+            return self._subset_string
+        def setSubsetString(self, expression):
+            self._subset_string = expression
+            return True
 
     class QgsMapLayerStyle:
         def __init__(self):
@@ -541,7 +571,7 @@ except ImportError:
             self.source_layer = layer
         def writeToLayer(self, layer):
             self.target_layer = layer
-            
+
     class QgsRasterLayer(QgsMapLayer):
         def __init__(self, path, name, provider):
             super().__init__(name, name, path, provider)
@@ -574,13 +604,13 @@ try:
     from .layer_model import LayerTreeModel, LayerItem, FolderItem, split_qgis_source, get_layer_format
     from .treemap_widget import TreeMapWidget
     from .mindmap_view import MindMapView
-    from .file_operations import safe_copy, safe_move, safe_rename, safe_rename_parent_dir, safe_rename_dir, safe_migrate_dir, update_layer_source, get_associated_files, format_size, resolve_physical_path
+    from .file_operations import safe_copy, safe_move, safe_rename, safe_rename_parent_dir, safe_rename_dir, safe_migrate_dir, update_layer_source, get_associated_files, format_size, resolve_physical_path, pending_rename_cleanup_files
 except ImportError:
     try:
         from layer_model import LayerTreeModel, LayerItem, FolderItem, split_qgis_source, get_layer_format
         from treemap_widget import TreeMapWidget
         from mindmap_view import MindMapView
-        from file_operations import safe_copy, safe_move, safe_rename, safe_rename_parent_dir, safe_rename_dir, safe_migrate_dir, update_layer_source, get_associated_files, format_size, resolve_physical_path
+        from file_operations import safe_copy, safe_move, safe_rename, safe_rename_parent_dir, safe_rename_dir, safe_migrate_dir, update_layer_source, get_associated_files, format_size, resolve_physical_path, pending_rename_cleanup_files
     except ImportError:
         # Mock models and operations for standalone tests
         class LayerTreeModel:
@@ -609,6 +639,7 @@ except ImportError:
         def safe_copy(*args): pass
         def safe_move(*args): pass
         def safe_rename(*args): pass
+        def pending_rename_cleanup_files(): return []
         def safe_rename_parent_dir(*args): pass
         def update_layer_source(*args): pass
         def split_qgis_source(x): return x, ""
@@ -716,6 +747,8 @@ class DraggableTreeView(QTreeView):
                     self._drag_start_pos = None
             else:
                 self._drag_start_pos = None
+        else:
+            self._drag_start_pos = None
         try:
             super().mousePressEvent(event)
         except AttributeError:
@@ -775,14 +808,14 @@ class DraggableTreeView(QTreeView):
                         actual_source_path = resolve_physical_path(phys_source_path)
                         if actual_source_path:
                             target_folder_path = os.path.dirname(actual_source_path)
-                    
+
                     if target_folder_path:
                         try:
                             import json
                             layer_ids = json.loads(event.mimeData().data("application/x-superlayer-layer-ids").data().decode('utf-8'))
                         except Exception:
                             layer_ids = []
-                        
+
                         if layer_ids:
                             self.layersDropped.emit(layer_ids, target_folder_path)
                             event.acceptProposedAction()
@@ -798,17 +831,17 @@ class DraggableTreeView(QTreeView):
         model = self.model()
         if not model:
             return
-            
+
         layer_ids = []
         for idx in self.selectionModel().selectedIndexes():
             if idx.column() == 0:
                 item = model.itemFromIndex(idx)
                 if isinstance(item, LayerItem) and item.layer:
                     layer_ids.append(item.layer.id())
-                    
+
         if not layer_ids:
             return
-            
+
         try:
             from qgis.PyQt.QtGui import QDrag
             from qgis.PyQt.QtCore import QMimeData
@@ -826,13 +859,455 @@ class DraggableTreeView(QTreeView):
                         from PySide6.QtCore import QMimeData
                     except ImportError:
                         return
-                        
+
         mime_data = QMimeData()
         import json
         mime_data.setData("application/x-superlayer-layer-ids", json.dumps(layer_ids).encode('utf-8'))
-        
+
         drag = QDrag(self)
         drag.setMimeData(mime_data)
+        drag.exec(Qt.DropAction.MoveAction)
+
+
+class LayerOrderTreeModel(QgsLayerTreeModel):
+    """Native QGIS model restricted to sibling layer-node reordering."""
+
+    def __init__(self, root):
+        super().__init__(root)
+        self._drag_parent_node = None
+        self._theme_layer_ids = None
+        flag_scope = getattr(QgsLayerTreeModel, "Flag", QgsLayerTreeModel)
+        for flag_name in ("AllowNodeReorder", "AllowNodeRename", "AllowNodeChangeVisibility"):
+            flag = getattr(flag_scope, flag_name, None)
+            if flag is not None:
+                self.setFlag(flag, True)
+
+    def set_theme_layer_ids(self, layer_ids=None):
+        """Show a read-only map-theme check state without changing the canvas."""
+        self._theme_layer_ids = set(layer_ids) if layer_ids is not None else None
+        if hasattr(self, 'beginResetModel') and hasattr(self, 'endResetModel'):
+            self.beginResetModel()
+            self.endResetModel()
+
+    def _descendant_theme_states(self, node):
+        states = []
+        for child in node.children() if node and hasattr(node, 'children') else []:
+            layer = self._node_layer(child)
+            if layer:
+                states.append(layer.id() in self._theme_layer_ids)
+            else:
+                states.extend(self._descendant_theme_states(child))
+        return states
+
+    def data(self, index, role):
+        check_role = getattr(getattr(Qt, 'ItemDataRole', Qt), 'CheckStateRole', None)
+        if self._theme_layer_ids is not None and role == check_role and index.isValid() and index.column() == 0:
+            node = self.index2node(index)
+            layer = self._node_layer(node)
+            check_scope = getattr(Qt, 'CheckState', Qt)
+            checked = getattr(check_scope, 'Checked', 2)
+            unchecked = getattr(check_scope, 'Unchecked', 0)
+            partial = getattr(check_scope, 'PartiallyChecked', 1)
+            if layer:
+                return checked if layer.id() in self._theme_layer_ids else unchecked
+            states = self._descendant_theme_states(node)
+            if states:
+                if all(states):
+                    return checked
+                if any(states):
+                    return partial
+                return unchecked
+        try:
+            return super().data(index, role)
+        except AttributeError:
+            return None
+
+    @staticmethod
+    def _node_layer(node):
+        try:
+            return node.layer() if node and hasattr(node, "layer") else None
+        except RuntimeError:
+            return None
+
+    def flags(self, index):
+        base_flags = super().flags(index)
+        if not index.isValid():
+            return base_flags
+        node = self.index2node(index)
+        if self._node_layer(node):
+            if self._theme_layer_ids is not None:
+                checkable_flag = getattr(getattr(Qt, 'ItemFlag', Qt), 'ItemIsUserCheckable', None)
+                if checkable_flag is not None:
+                    return base_flags & ~checkable_flag
+            return base_flags
+        item_flag_scope = getattr(Qt, "ItemFlag", Qt)
+        drag_flag = getattr(item_flag_scope, "ItemIsDragEnabled", None)
+        return base_flags & ~drag_flag if drag_flag is not None else base_flags
+
+    def mimeData(self, indexes):
+        nodes = []
+        for index in indexes:
+            if not index.isValid() or index.column() != 0:
+                continue
+            node = self.index2node(index)
+            if self._node_layer(node) and node not in nodes:
+                nodes.append(node)
+        if not nodes:
+            self._drag_parent_node = None
+            return None
+        parent = nodes[0].parent()
+        if not parent or any(node.parent() != parent for node in nodes):
+            self._drag_parent_node = None
+            return None
+        self._drag_parent_node = parent
+        return super().mimeData([self.node2index(node) for node in nodes])
+
+    def dropMimeData(self, data, action, row, column, parent):
+        source_parent = self._drag_parent_node
+        try:
+            target_parent = self.index2node(parent) if parent.isValid() else self.rootGroup()
+            if not source_parent or target_parent != source_parent:
+                return False
+            return super().dropMimeData(data, action, row, column, parent)
+        finally:
+            self._drag_parent_node = None
+
+
+class DraggableGroupTreeView(QTreeView):
+    try:
+        from qgis.PyQt.QtCore import pyqtSignal as groupReorderedSignal
+    except ImportError:
+        try:
+            from qtpy.QtCore import Signal as groupReorderedSignal
+        except ImportError:
+            try:
+                from PySide2.QtCore import Signal as groupReorderedSignal
+            except ImportError:
+                try:
+                    from PySide6.QtCore import Signal as groupReorderedSignal
+                except ImportError:
+                    class groupReorderedSignal:
+                        def __init__(self, *args):
+                            self._slots = []
+                        def emit(self, *args):
+                            for s in self._slots: s(*args)
+                        def connect(self, s):
+                            self._slots.append(s)
+
+    groupReordered = groupReorderedSignal(list, dict, str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDragEnabled(False)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self._drag_start_pos = None
+        self._drop_target_index = None
+        self._drop_position = None
+        self._reorder_enabled = True
+
+    def setReorderEnabled(self, enabled):
+        """Enable ordering only when the view represents the complete tree."""
+        self._reorder_enabled = bool(enabled)
+        if not self._reorder_enabled:
+            self._drag_start_pos = None
+            self._drop_target_index = None
+            self._drop_position = None
+            viewport = self.viewport() if hasattr(self, "viewport") else None
+            if viewport:
+                viewport.update()
+
+    def mousePressEvent(self, event):
+        if self._reorder_enabled and event.button() == Qt.MouseButton.LeftButton:
+            idx = self.indexAt(event.pos())
+            if idx.isValid():
+                model = self.model() if hasattr(self, "model") else None
+                item = model.itemFromIndex(idx) if model and idx.column() == 0 else None
+                can_drag = (isinstance(item, LayerItem) and item.layer) if model else idx.column() == 0
+                if can_drag:
+                    self._drag_start_pos = event.pos()
+                else:
+                    self._drag_start_pos = None
+            else:
+                self._drag_start_pos = None
+        else:
+            self._drag_start_pos = None
+        try:
+            super().mousePressEvent(event)
+        except AttributeError:
+            pass
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() & Qt.MouseButton.LeftButton and self._drag_start_pos is not None:
+            delta = event.pos() - self._drag_start_pos
+            if delta.manhattanLength() >= _get_drag_distance():
+                self.start_group_drag()
+                self._drag_start_pos = None
+                return
+            # Suppress default Qt drag selection (rubberband/multi-row selection while dragging mouse)
+            return
+        try:
+            super().mouseMoveEvent(event)
+        except AttributeError:
+            pass
+
+    def mouseReleaseEvent(self, event):
+        self._drag_start_pos = None
+        try:
+            super().mouseReleaseEvent(event)
+        except AttributeError:
+            pass
+
+    def dragEnterEvent(self, event):
+        if self._reorder_enabled and event.mimeData().hasFormat("application/x-superlayer-group-reorder"):
+            event.acceptProposedAction()
+        else:
+            try:
+                super().dragEnterEvent(event)
+            except AttributeError:
+                pass
+
+    def dragMoveEvent(self, event):
+        if self._reorder_enabled and event.mimeData().hasFormat("application/x-superlayer-group-reorder"):
+            idx = self.indexAt(event.pos())
+            if idx.isValid():
+                if idx.column() != 0:
+                    idx = idx.sibling(idx.row(), 0)
+                model = self.model()
+                target_item = model.itemFromIndex(idx) if model else None
+                if not isinstance(target_item, LayerItem) or not target_item.layer:
+                    self._drop_target_index = None
+                    self._drop_position = None
+                    if self.viewport():
+                        self.viewport().update()
+                    event.ignore()
+                    return
+                rect = self.visualRect(idx)
+                pos_in_item = event.pos().y() - rect.top()
+                position = "above" if pos_in_item < rect.height() * 0.5 else "below"
+
+                try:
+                    self._drop_target_index = QPersistentModelIndex(idx)
+                except (TypeError, AttributeError):
+                    self._drop_target_index = idx
+                self._drop_position = position
+                if self.viewport():
+                    self.viewport().update()
+
+                event.acceptProposedAction()
+                return
+            else:
+                self._drop_target_index = None
+                self._drop_position = None
+                if self.viewport():
+                    self.viewport().update()
+            event.ignore()
+        else:
+            try:
+                super().dragMoveEvent(event)
+            except AttributeError:
+                pass
+
+    def dragLeaveEvent(self, event):
+        self._drop_target_index = None
+        self._drop_position = None
+        if self.viewport():
+            self.viewport().update()
+        try:
+            super().dragLeaveEvent(event)
+        except AttributeError:
+            pass
+
+    def dropEvent(self, event):
+        self._drop_target_index = None
+        self._drop_position = None
+        if self.viewport():
+            self.viewport().update()
+
+        if self._reorder_enabled and event.mimeData().hasFormat("application/x-superlayer-group-reorder"):
+            idx = self.indexAt(event.pos())
+            if idx.isValid():
+                if idx.column() != 0:
+                    idx = idx.sibling(idx.row(), 0)
+                model = self.model()
+                if model:
+                    target_item = model.itemFromIndex(idx)
+                    rect = self.visualRect(idx)
+                    pos_in_item = event.pos().y() - rect.top()
+
+                    if not isinstance(target_item, LayerItem) or not target_item.layer:
+                        event.ignore()
+                        return
+                    position = "above" if pos_in_item < rect.height() * 0.5 else "below"
+
+                    try:
+                        import json
+                        dragged_data = json.loads(event.mimeData().data("application/x-superlayer-group-reorder").data().decode('utf-8'))
+                    except Exception:
+                        dragged_data = []
+
+                    target_info = {}
+                    if isinstance(target_item, LayerItem) and target_item.layer:
+                        target_info = {"type": "layer", "id": target_item.layer.id()}
+
+                    if dragged_data and target_info:
+                        # Never rebuild this view's model from inside QDropEvent.
+                        # The event still owns QModelIndex/internal Qt pointers; a
+                        # synchronous refresh invalidates them and can terminate
+                        # QGIS in native code after the handler returns.
+                        queued_dragged = [dict(item) for item in dragged_data]
+                        queued_target = dict(target_info)
+                        QTimer.singleShot(
+                            0,
+                            lambda items=queued_dragged, target=queued_target, pos=position:
+                                self.groupReordered.emit(items, target, pos)
+                        )
+                        event.acceptProposedAction()
+                        return
+            event.ignore()
+        else:
+            try:
+                super().dropEvent(event)
+            except AttributeError:
+                pass
+
+    def paintEvent(self, event):
+        try:
+            super().paintEvent(event)
+        except Exception:
+            pass  # nosec B110
+
+        drop_target = getattr(self, '_drop_target_index', None)
+        drop_pos = getattr(self, '_drop_position', None)
+        if drop_target and drop_target.isValid() and drop_pos:
+            # PyQt5 does not implicitly convert QPersistentModelIndex for
+            # QAbstractItemView.visualRect(), although PyQt6 often does.
+            try:
+                paint_index = QModelIndex(drop_target)
+            except (TypeError, AttributeError):
+                # Fallback for bindings without the conversion constructor.
+                drop_model = drop_target.model()
+                paint_index = drop_model.index(
+                    drop_target.row(), drop_target.column(), drop_target.parent()
+                )
+            try:
+                from qgis.PyQt.QtGui import QPainter, QPen, QColor, QBrush
+                from qgis.PyQt.QtCore import QPoint
+            except ImportError:
+                try:
+                    from qtpy.QtGui import QPainter, QPen, QColor, QBrush
+                    from qtpy.QtCore import QPoint
+                except ImportError:
+                    try:
+                        from PySide2.QtGui import QPainter, QPen, QColor, QBrush
+                        from PySide2.QtCore import QPoint
+                    except ImportError:
+                        try:
+                            from PySide6.QtGui import QPainter, QPen, QColor, QBrush
+                            from PySide6.QtCore import QPoint
+                        except ImportError:
+                            return
+
+            viewport = self.viewport()
+            if not viewport:
+                return
+
+            rect = self.visualRect(paint_index)
+            if not rect.isValid():
+                return
+
+            # Draw over the viewport after QTreeView has painted.  Qt's built-in
+            # indicator is unavailable because this view uses a custom MIME type.
+            painter = QPainter(viewport)
+            try:
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                right = max(rect.right(), viewport.width() - 2)
+
+                if self._drop_position in ("above", "below"):
+                    y = rect.top() if self._drop_position == "above" else rect.bottom()
+                    painter.setPen(QPen(QColor(0, 120, 212), 3))
+                    painter.drawLine(rect.left(), y, right, y)
+                    painter.setBrush(QBrush(QColor(0, 120, 212)))
+                    painter.drawEllipse(QPoint(rect.left() + 2, y), 3, 3)
+                    painter.drawEllipse(QPoint(right - 2, y), 3, 3)
+            finally:
+                painter.end()
+
+    def start_group_drag(self):
+        if not self._reorder_enabled:
+            return
+        model = self.model()
+        if not model:
+            return
+
+        dragged_items = []
+        selected_parents = set()
+        if self.selectionModel():
+            for idx in self.selectionModel().selectedIndexes():
+                if idx.column() == 0:
+                    item = model.itemFromIndex(idx)
+                    if isinstance(item, LayerItem) and item.layer:
+                        layer_id = item.layer.id()
+                        if not any(entry["id"] == layer_id for entry in dragged_items):
+                            dragged_items.append({"type": "layer", "id": layer_id, "name": item.layer.name()})
+                        if hasattr(item, "parent"):
+                            selected_parents.add(item.parent())
+
+        if not dragged_items or len(selected_parents) > 1:
+            return
+
+        try:
+            from qgis.PyQt.QtGui import QDrag, QPixmap, QPainter, QPen, QColor
+            from qgis.PyQt.QtCore import QMimeData, QPoint
+        except ImportError:
+            try:
+                from qtpy.QtGui import QDrag, QPixmap, QPainter, QPen, QColor
+                from qtpy.QtCore import QMimeData, QPoint
+            except ImportError:
+                try:
+                    from PySide2.QtGui import QDrag, QPixmap, QPainter, QPen, QColor
+                    from PySide2.QtCore import QMimeData, QPoint
+                except ImportError:
+                    try:
+                        from PySide6.QtGui import QDrag, QPixmap, QPainter, QPen, QColor
+                        from PySide6.QtCore import QMimeData, QPoint
+                    except ImportError:
+                        return
+
+        mime_data = QMimeData()
+        import json
+        mime_data.setData("application/x-superlayer-group-reorder", json.dumps(dragged_items).encode('utf-8'))
+
+        drag = QDrag(self)
+        drag.setMimeData(mime_data)
+
+        # Create drag preview pixmap
+        try:
+            count = len(dragged_items)
+            if count == 1:
+                display_txt = dragged_items[0].get("name", "图层")
+            else:
+                display_txt = f"移动 {count} 项"
+
+            pixmap = QPixmap(180, 26)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            p = QPainter(pixmap)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.setBrush(QColor(0, 120, 212, 220))
+            p.setPen(QPen(QColor(255, 255, 255), 1))
+            p.drawRoundedRect(0, 0, 179, 25, 4, 4)
+            p.setPen(QColor(255, 255, 255))
+            font = p.font()
+            font.setBold(True)
+            p.setFont(font)
+            p.drawText(10, 18, display_txt[:16])
+            p.end()
+
+            drag.setPixmap(pixmap)
+            drag.setHotSpot(QPoint(10, 13))
+        except Exception:
+            pass  # nosec B110
+
         drag.exec(Qt.DropAction.MoveAction)
 
 
@@ -844,7 +1319,7 @@ class SuperLayerDockWidget(QDialog):
         super().__init__(parent)
         self.iface = iface
         self.setWindowTitle("SuperLayer")
-        
+
         # Configure window properties
         self.resize(600, 450)
         try:
@@ -852,17 +1327,17 @@ class SuperLayerDockWidget(QDialog):
         except Exception as e:  # noqa: BLE001
             import logging
             logging.getLogger(__name__).warning("Failed to set window flags: %s", e)
-        
+
         # Setup UI components directly on dialog
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
-        
+
         # Toolbar
         self.toolbar = QToolBar()
         self.toolbar.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.layout.addWidget(self.toolbar)
-        
+
         # Tag Filter Row container
         self.filter_container = QWidget()
         self.filter_container.setObjectName("filterContainer")
@@ -870,60 +1345,74 @@ class SuperLayerDockWidget(QDialog):
         self.filter_layout.setContentsMargins(10, 4, 10, 4)
         self.filter_layout.setSpacing(6)
         self.filter_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        
+
         # Tag Filter Label indicator
         self.filter_label = QLabel(tr("格式过滤:"))
         self.filter_label.setStyleSheet("color: #6c757d; font-size: 11px; font-weight: bold;")
         self.filter_layout.addWidget(self.filter_label)
-        
+
         self.layout.addWidget(self.filter_container)
-        
+
         # Selected filter state and cache
         self.current_filter_format = None
+        # None means the live canvas visibility state. A string stores the
+        # QGIS map theme used when the visibility filter button is enabled.
+        self.current_map_theme = None
         self._current_avail_formats = []
         self.filter_buttons = {}
-        
+
         # Stacked View
         self.stacked_widget = QStackedWidget()
         self.layout.addWidget(self.stacked_widget, 1)
-        
+
         self.physical_tree_view = DraggableTreeView()
         self.physical_tree_view.setObjectName("physicalTreeView")
         self.physical_tree_view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.physical_tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.physical_tree_view.setAllColumnsShowFocus(True)
         self.physical_tree_view.setAlternatingRowColors(True)
-        
+
+        # The group panel uses QGIS' own model and Qt drag/drop implementation.
         self.group_tree_view = QTreeView()
         self.group_tree_view.setObjectName("groupTreeView")
         self.group_tree_view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.group_tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.group_tree_view.setAllColumnsShowFocus(True)
         self.group_tree_view.setAlternatingRowColors(True)
-        
+
         self.treemap_view = TreeMapWidget()
         self.mindmap_view = MindMapView()
         self.layer_board_view = LayerBoardWidget(self.iface, self) # NEW PAGE
-        
+
         self.stacked_widget.addWidget(self.physical_tree_view)
         self.stacked_widget.addWidget(self.group_tree_view)
         self.stacked_widget.addWidget(self.treemap_view)
         self.stacked_widget.addWidget(self.mindmap_view)
         self.stacked_widget.addWidget(self.layer_board_view) # NEW PAGE
-        
+
         # Models
         self.physical_model = LayerTreeModel()
-        self.group_model = LayerTreeModel()
-        
+        project = QgsProject.instance()
+        group_root = project.layerTreeRoot() if project and hasattr(project, "layerTreeRoot") else None
+        self.group_model = LayerOrderTreeModel(group_root)
+
 
         self.physical_tree_view.setModel(self.physical_model)
         self.group_tree_view.setModel(self.group_model)
-        
+        self.group_tree_view.setDragEnabled(True)
+        self.group_tree_view.setAcceptDrops(True)
+        self.group_tree_view.setDropIndicatorShown(True)
+        if hasattr(self.group_tree_view, "setDragDropMode"):
+            drag_drop_scope = getattr(QAbstractItemView, "DragDropMode", QAbstractItemView)
+            mode = getattr(drag_drop_scope, "InternalMove", None)
+            if mode is not None:
+                self.group_tree_view.setDragDropMode(mode)
+
         # Column widths are applied in refresh() after rebuild_model()
-        
+
         # States
         self.group_by_physical = True
-        
+
         self._setup_toolbar()
         self._setup_connections()
         self._apply_styles()
@@ -995,82 +1484,104 @@ class SuperLayerDockWidget(QDialog):
             }
         """)
 
+        # Keep visibility state visually independent from row selection. Native
+        # Windows/Qt styles recolor check indicators with HighlightedText, making
+        # a selected visible layer look faded or disabled.
+        icon_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons_panel")
+        checked_icon = os.path.join(icon_dir, "Visibility_Checked.svg").replace("\\", "/")
+        unchecked_icon = os.path.join(icon_dir, "Visibility_Unchecked.svg").replace("\\", "/")
+        partial_icon = os.path.join(icon_dir, "Visibility_Partial.svg").replace("\\", "/")
+        if hasattr(self.group_tree_view, "setStyleSheet"):
+            self.group_tree_view.setStyleSheet(f"""
+                QTreeView::indicator {{
+                    width: 16px;
+                    height: 16px;
+                }}
+                QTreeView::indicator:checked {{ image: url(\"{checked_icon}\"); }}
+                QTreeView::indicator:unchecked {{ image: url(\"{unchecked_icon}\"); }}
+                QTreeView::indicator:indeterminate {{ image: url(\"{partial_icon}\"); }}
+            """)
+
     def _setup_toolbar(self):
         if hasattr(self.toolbar, 'setToolButtonStyle') and hasattr(Qt, 'ToolButtonTextBesideIcon'):
             self.toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-            
+
         if hasattr(self.toolbar, 'setIconSize'):
             self.toolbar.setIconSize(QSize(16, 16))
-            
+
         icon_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons_panel_toolbar")
-        
+
         def get_toolbar_icon(name):
             icon_path = os.path.join(icon_dir, name)
             if os.path.exists(icon_path):
                 return QIcon(icon_path)
             return QIcon()
-            
+
         self.view_group = QActionGroup(self)
         self.view_group.setExclusive(True)
-        
+
         self.act_physical_tree = QAction(get_toolbar_icon("panel_toolbar_document.svg"), tr("文件夹分类"), self)
         self.act_physical_tree.setCheckable(True)
         self.act_physical_tree.setChecked(True)
         self.act_physical_tree.triggered.connect(lambda: self.switch_view(0))
         self.view_group.addAction(self.act_physical_tree)
         self.toolbar.addAction(self.act_physical_tree)
-        
+
         self.act_group_tree = QAction(get_toolbar_icon("panel_toolbar_group.svg"), tr("图层分类"), self)
         self.act_group_tree.setCheckable(True)
         self.act_group_tree.triggered.connect(lambda: self.switch_view(1))
         self.view_group.addAction(self.act_group_tree)
         self.toolbar.addAction(self.act_group_tree)
-        
+
         self.act_treemap = QAction(get_toolbar_icon("panel_toolbar_Rec-Tree_Chart.svg"), tr("矩形树状图"), self)
         self.act_treemap.setCheckable(True)
         self.act_treemap.triggered.connect(lambda: self.switch_view(2))
         self.view_group.addAction(self.act_treemap)
         self.toolbar.addAction(self.act_treemap)
-        
+
         self.act_mindmap = QAction(get_toolbar_icon("panel_toolbar_Mindmap.svg"), tr("路径导图"), self)
         self.act_mindmap.setCheckable(True)
         self.act_mindmap.triggered.connect(lambda: self.switch_view(3))
         self.view_group.addAction(self.act_mindmap)
         self.toolbar.addAction(self.act_mindmap)
-        
+
         # Add new Attribute Board Action
         self.act_layer_board = QAction(get_toolbar_icon("panel_toolbar_batch-modify.svg"), tr("批量修改"), self)
         self.act_layer_board.setCheckable(True)
         self.act_layer_board.triggered.connect(lambda: self.switch_view(4))
         self.view_group.addAction(self.act_layer_board)
         self.toolbar.addAction(self.act_layer_board)
-        
+
         self.toolbar.addSeparator()
-        
+
         self.act_refresh = QAction(get_toolbar_icon("panel_toolbar_refresh.svg"), tr("刷新"), self)
         self.act_refresh.triggered.connect(self.refresh)
         self.toolbar.addAction(self.act_refresh)
-        
+
         # Add expanding spacer to push the filter button to the right end
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.toolbar.addWidget(spacer)
-        
+
         # Add Filter Visible Only button to main toolbar
         self.btn_filter_visible = QToolButton()
         self.btn_filter_visible.setObjectName("btnFilterVisible")
         self.btn_filter_visible.setCheckable(True)
         self.btn_filter_visible.setToolTip(tr("只展示显示的图层"))
         self.btn_filter_visible.setIconSize(QSize(16, 16))
-        
+
         # Load filter visible layers icon
         plugin_dir = os.path.dirname(os.path.abspath(__file__))
         icon_path = os.path.join(plugin_dir, "icons_panel", "Filter_visible_layers.svg")
         if os.path.exists(icon_path):
             self.btn_filter_visible.setIcon(QIcon(icon_path))
-            
+
         self.btn_filter_visible.toggled.connect(self.on_filter_visible_toggled)
-        
+        if hasattr(self.btn_filter_visible, 'setContextMenuPolicy'):
+            self.btn_filter_visible.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        if hasattr(self.btn_filter_visible, 'customContextMenuRequested'):
+            self.btn_filter_visible.customContextMenuRequested.connect(self.show_filter_context_menu)
+
         # Styled beautifully matching application theme
         self.btn_filter_visible.setStyleSheet("""
             QToolButton#btnFilterVisible {
@@ -1104,34 +1615,33 @@ class SuperLayerDockWidget(QDialog):
         self.physical_tree_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.physical_tree_view.customContextMenuRequested.connect(self.show_physical_tree_context_menu)
         self.physical_tree_view.layersDropped.connect(self.handle_multiple_layers_relocation)
-        
+
         self.group_tree_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.group_tree_view.customContextMenuRequested.connect(self.show_group_tree_context_menu)
-        
+
         self.treemap_view.contextMenuTriggered.connect(self.show_treemap_context_menu)
-        
+
         # Focus on double click
         self.physical_tree_view.doubleClicked.connect(self.on_item_double_clicked)
         self.group_tree_view.doubleClicked.connect(self.on_item_double_clicked)
         self.treemap_view.layerSelected.connect(self.focus_layer_by_id)
-        
+
         # Mind map connections
         self.mindmap_view.layerSelected.connect(self.focus_layer_by_id)
         self.mindmap_view.layerDoubleClicked.connect(self.focus_layer_by_id)
         self.mindmap_view.contextMenuTriggered.connect(self.show_treemap_context_menu)
         self.mindmap_view.layerRelocationRequested.connect(self.handle_layer_relocation)
         self.mindmap_view.folderRelocationRequested.connect(self.handle_folder_relocation)
-        
+
         # Model item changed connections
         self.physical_model.itemChanged.connect(self.on_item_changed)
-        self.group_model.itemChanged.connect(self.on_item_changed)
-        
+
         # Debounced refresh timer for safe asynchronous tree updates
         self._refresh_timer = QTimer(self)
         self._refresh_timer.setSingleShot(True)
         self._refresh_timer.setInterval(50)  # 50ms debounce
         self._refresh_timer.timeout.connect(lambda: self.refresh())
-        
+
         # Auto refresh on QGIS layer tree visibility changes
         try:
             from qgis.core import QgsProject
@@ -1151,13 +1661,13 @@ class SuperLayerDockWidget(QDialog):
             except ImportError:
                 def get_format_color_dict(f):
                     return {"bg": "#f1f3f5", "border": "#ced4da", "text": "#495057", "treemap": "#0d6efd"}
-                    
+
         if hasattr(btn, 'text'):
             btn_text = btn.text()
         else:
             btn_text = getattr(btn, '_text', "")
         colors = get_format_color_dict(btn_text)
-        
+
         if active:
             bg = colors["treemap"]
             text_color = "#ffffff"
@@ -1196,12 +1706,12 @@ class SuperLayerDockWidget(QDialog):
         try:
             from .layer_model import get_layer_format
         except ImportError:
-            def get_layer_format(l):
-                source = getattr(l, 'source', lambda: '')()
+            def get_layer_format(layer):
+                source = getattr(layer, 'source', lambda: '')()
                 if source.endswith('.shp'): return 'shp'
                 if source.endswith('.tif'): return 'tif'
                 return 'other'
-                
+
         project = QgsProject.instance()
         formats = set()
         has_invalid = False
@@ -1214,35 +1724,35 @@ class SuperLayerDockWidget(QDialog):
                     formats.add(fmt.upper())
             if has_invalid:
                 formats.add("不可用图层")
-                    
+
         priority = {"SHP": 1, "GPKG": 2, "GDB": 3, "TIF": 4, "TIFF": 5, "在线图层": 10, "不可用图层": 15, "其他": 20}
         sorted_formats = sorted(list(formats), key=lambda x: (priority.get(x, 5), x))
-        
+
         if self.current_filter_format and self.current_filter_format not in sorted_formats:
             self.current_filter_format = None
-            
+
         existing_formats = getattr(self, '_current_avail_formats', [])
         if sorted_formats != existing_formats:
             self._current_avail_formats = sorted_formats
-            
+
             while self.filter_layout.count() > 1:
                 item = self.filter_layout.takeAt(1)
                 if item:
                     widget = item.widget()
                     if widget:
                         widget.deleteLater()
-                        
+
             btn_all = QPushButton(tr("全部"))
             self.filter_layout.addWidget(btn_all)
             btn_all.clicked.connect(lambda: self.set_filter_format(None))
             self.filter_buttons = {"全部": btn_all}
-            
+
             for fmt in sorted_formats:
                 btn = QPushButton(fmt)
                 self.filter_layout.addWidget(btn)
                 btn.clicked.connect(lambda checked, f=fmt: self.set_filter_format(f))
                 self.filter_buttons[fmt] = btn
-                
+
         active_key = self.current_filter_format if self.current_filter_format else "全部"
         for key, btn in self.filter_buttons.items():
             self.set_tag_button_active(btn, key == active_key)
@@ -1251,11 +1761,11 @@ class SuperLayerDockWidget(QDialog):
         if self.current_filter_format == fmt:
             return
         self.current_filter_format = fmt
-        
+
         active_key = fmt if fmt else "全部"
         for key, btn in self.filter_buttons.items():
             self.set_tag_button_active(btn, key == active_key)
-            
+
         self.refresh()
 
     def _get_filtered_layers(self, filter_str):
@@ -1268,26 +1778,166 @@ class SuperLayerDockWidget(QDialog):
                 try:
                     from layer_model import get_layer_format, is_layer_effectively_visible
                 except ImportError:
-                    def get_layer_format(l):
-                        source = getattr(l, 'source', lambda: '')()
+                    def get_layer_format(layer):
+                        source = getattr(layer, 'source', lambda: '')()
                         if source.endswith('.shp'): return 'shp'
                         if source.endswith('.tif'): return 'tif'
                         return 'other'
-                    def is_layer_effectively_visible(l):
+                    def is_layer_effectively_visible(layer):
                         return True
-                        
+
             all_layers = list(project.mapLayers().values())
             if filter_str:
                 if filter_str == "不可用图层":
-                    layers = [l for l in all_layers if hasattr(l, 'isValid') and not l.isValid()]
+                    layers = [layer for layer in all_layers if hasattr(layer, 'isValid') and not layer.isValid()]
                 else:
-                    layers = [l for l in all_layers if get_layer_format(l) == filter_str]
+                    layers = [layer for layer in all_layers if get_layer_format(layer) == filter_str]
             else:
                 layers = all_layers
-                
+
             if hasattr(self, 'btn_filter_visible') and self.btn_filter_visible.isChecked():
-                layers = [l for l in layers if is_layer_effectively_visible(l)]
+                theme_name = getattr(self, 'current_map_theme', None)
+                if theme_name:
+                    theme_layer_ids = self._map_theme_layer_ids(theme_name)
+                    layers = [layer for layer in layers if layer.id() in theme_layer_ids]
+                else:
+                    layers = [layer for layer in layers if is_layer_effectively_visible(layer)]
         return layers
+
+    def _map_theme_layer_ids(self, theme_name):
+        """Return layer IDs recorded as visible in a QGIS map theme."""
+        project = QgsProject.instance()
+        if not project or not theme_name or not hasattr(project, 'mapThemeCollection'):
+            return set()
+        collection = project.mapThemeCollection()
+        if not collection:
+            return set()
+        try:
+            visible_layers = collection.mapThemeVisibleLayers(theme_name)
+        except Exception:
+            return set()
+        result = set()
+        for layer in visible_layers or []:
+            if hasattr(layer, 'id'):
+                result.add(layer.id())
+            elif isinstance(layer, str):
+                result.add(layer)
+        return result
+
+    def set_visibility_filter_source(self, theme_name=None):
+        """Select live canvas visibility or a map theme and enable filtering."""
+        self.current_map_theme = theme_name
+        if theme_name:
+            tooltip = tr("按地图主题过滤：{}").format(theme_name)
+        else:
+            tooltip = tr("只展示当前地图中显示的图层")
+        self.btn_filter_visible.setToolTip(tooltip)
+        if not self.btn_filter_visible.isChecked():
+            self.btn_filter_visible.setChecked(True)
+        else:
+            self.on_filter_visible_toggled(True)
+
+    def show_filter_context_menu(self, pos):
+        """Open the visibility-filter source menu without applying a map theme."""
+        menu = QMenu(self)
+        live_action = menu.addAction(tr("当前地图显示状态"))
+        live_action.setCheckable(True)
+        live_action.setChecked(getattr(self, 'current_map_theme', None) is None)
+        live_action.triggered.connect(lambda checked=False: self.set_visibility_filter_source(None))
+
+        theme_menu = menu.addMenu(tr("QGIS 地图主题"))
+        project = QgsProject.instance()
+        collection = project.mapThemeCollection() if project and hasattr(project, 'mapThemeCollection') else None
+        try:
+            theme_names = sorted(collection.mapThemes()) if collection else []
+        except Exception:
+            theme_names = []
+        if not theme_names:
+            empty_action = theme_menu.addAction(tr("没有可用的地图主题"))
+            empty_action.setEnabled(False)
+        else:
+            for theme_name in theme_names:
+                action = theme_menu.addAction(theme_name)
+                action.setCheckable(True)
+                action.setChecked(theme_name == getattr(self, 'current_map_theme', None))
+                action.triggered.connect(
+                    lambda checked=False, name=theme_name: self.set_visibility_filter_source(name)
+                )
+
+        global_pos = self.btn_filter_visible.mapToGlobal(pos) if hasattr(self.btn_filter_visible, 'mapToGlobal') else pos
+        menu.exec(global_pos)
+
+    def _set_group_reorder_actions_enabled(self, enabled):
+        """Enable both order actions without coupling tests to a Qt binding."""
+        for action_name in ("act_group_move_up", "act_group_move_down"):
+            action = getattr(self, action_name, None)
+            if action is not None and hasattr(action, "setEnabled"):
+                action.setEnabled(bool(enabled))
+
+    def _update_group_reorder_actions(self, filter_str=None, filter_visible=None):
+        """Ordering is safe only in the complete, unfiltered group view."""
+        if filter_str is None:
+            filter_str = self.current_filter_format.lower() if self.current_filter_format else None
+        if filter_visible is None:
+            button = getattr(self, "btn_filter_visible", None)
+            filter_visible = bool(button and button.isChecked())
+        stacked = getattr(self, "stacked_widget", None)
+        in_group_view = bool(stacked and stacked.currentIndex() == 1)
+        for action_name in ("act_group_move_up", "act_group_move_down"):
+            action = getattr(self, action_name, None)
+            if action is not None and hasattr(action, "setVisible"):
+                action.setVisible(in_group_view)
+        self._set_group_reorder_actions_enabled(
+            in_group_view and not filter_str and not filter_visible
+        )
+
+    def move_selected_group_layer(self, direction):
+        """Move one selected layer one position within its current QGIS group."""
+        if direction not in (-1, 1):
+            return
+
+        filter_str = self.current_filter_format.lower() if self.current_filter_format else None
+        filter_visible = bool(self.btn_filter_visible.isChecked()) if hasattr(self, "btn_filter_visible") else False
+        if self.stacked_widget.currentIndex() != 1 or filter_str or filter_visible:
+            return
+
+        selection_model = self.group_tree_view.selectionModel()
+        if not selection_model:
+            return
+        selected_layers = []
+        for index in selection_model.selectedIndexes():
+            if index.column() != 0:
+                continue
+            item = self.group_model.itemFromIndex(index)
+            if isinstance(item, LayerItem) and item.layer and item.layer.id() not in selected_layers:
+                selected_layers.append(item.layer.id())
+        if len(selected_layers) != 1:
+            return
+
+        root = QgsProject.instance().layerTreeRoot()
+        source_node = root.findLayer(selected_layers[0]) if root else None
+        parent = source_node.parent() if source_node else None
+        if not parent:
+            return
+        children = parent.children()
+        try:
+            source_row = children.index(source_node)
+        except ValueError:
+            return
+
+        target_row = source_row + direction
+        if target_row < 0 or target_row >= len(children):
+            return
+        target_node = children[target_row]
+        target_layer = target_node.layer() if hasattr(target_node, "layer") else None
+        if not target_layer:
+            return
+
+        self.handle_group_reorder(
+            [{"type": "layer", "id": selected_layers[0]}],
+            {"type": "layer", "id": target_layer.id()},
+            "above" if direction < 0 else "below",
+        )
 
     def switch_view(self, index):
         self.act_physical_tree.setChecked(index == 0)
@@ -1296,15 +1946,15 @@ class SuperLayerDockWidget(QDialog):
         self.act_mindmap.setChecked(index == 3)
         self.act_layer_board.setChecked(index == 4) # NEW
         self.stacked_widget.setCurrentIndex(index)
-        
+
         if index == 4:
             self.filter_container.hide()
         else:
             self.filter_container.show()
-        
+
         filter_str = self.current_filter_format.lower() if self.current_filter_format else None
         layers = self._get_filtered_layers(filter_str)
-                
+
         if index == 2:
             self.treemap_view.set_layers(layers)
         elif index == 3:
@@ -1334,8 +1984,24 @@ class SuperLayerDockWidget(QDialog):
             self.refresh()
 
     def on_filter_visible_toggled(self, checked):
+        theme_layer_ids = None
+        if checked and getattr(self, 'current_map_theme', None):
+            theme_layer_ids = self._map_theme_layer_ids(self.current_map_theme)
+        if hasattr(self, 'group_model') and hasattr(self.group_model, 'set_theme_layer_ids'):
+            self.group_model.set_theme_layer_ids(theme_layer_ids)
         if hasattr(self, 'layer_board_view') and self.layer_board_view:
-            self.layer_board_view.on_filter_visible_toggled(checked)
+            if hasattr(self.layer_board_view, 'set_visibility_filter'):
+                self.layer_board_view.set_visibility_filter(checked, theme_layer_ids)
+            else:
+                self.layer_board_view.on_filter_visible_toggled(checked)
+        if checked:
+            theme_name = getattr(self, 'current_map_theme', None)
+            if theme_name:
+                self.btn_filter_visible.setToolTip(tr("按地图主题过滤：{}").format(theme_name))
+            else:
+                self.btn_filter_visible.setToolTip(tr("只展示当前地图中显示的图层"))
+        else:
+            self.btn_filter_visible.setToolTip(tr("图层过滤已关闭；右键选择地图主题"))
         self.refresh()
 
     def refresh(self, *args, **kwargs):
@@ -1362,14 +2028,14 @@ class SuperLayerDockWidget(QDialog):
             def get_tree_state(tree_view, model):
                 expanded_keys = set()
                 selected_keys = set()
-                
+
                 if not hasattr(model, 'index') or 'Mock' in type(model).__name__:
                     return expanded_keys, selected_keys, 0, 0
-                
+
                 # Check method availability to support mock testing objects safely
                 has_is_expanded = hasattr(tree_view, 'isExpanded')
                 has_selection_model = hasattr(tree_view, 'selectionModel') and tree_view.selectionModel() is not None and hasattr(tree_view.selectionModel(), 'isSelected')
-                
+
                 def traverse(index):
                     if not index.isValid() or 'Mock' in type(index).__name__:
                         return
@@ -1385,10 +2051,10 @@ class SuperLayerDockWidget(QDialog):
                                 selected_keys.add(key)
                     for row in range(model.rowCount(index)):
                         traverse(model.index(row, 0, index))
-                        
+
                 for row in range(model.rowCount()):
                     traverse(model.index(row, 0))
-                    
+
                 v_val = 0
                 h_val = 0
                 if hasattr(tree_view, 'verticalScrollBar') and tree_view.verticalScrollBar():
@@ -1408,11 +2074,11 @@ class SuperLayerDockWidget(QDialog):
                     return
                 if not hasattr(model, 'index') or 'Mock' in type(model).__name__:
                     return
-                    
+
                 expanded_keys, selected_keys, v_val, h_val = state
                 selection_model = tree_view.selectionModel() if hasattr(tree_view, 'selectionModel') else None
                 has_set_expanded = hasattr(tree_view, 'setExpanded')
-                
+
                 def traverse(index):
                     if not index.isValid() or 'Mock' in type(index).__name__:
                         return
@@ -1431,19 +2097,19 @@ class SuperLayerDockWidget(QDialog):
                                         tree_view.setExpanded(index, True)
                                     else:
                                         tree_view.setExpanded(index, False)
-                                        
+
                             # Restore selection state
                             if selection_model and hasattr(selection_model, 'select') and key in selected_keys:
                                 selection_model.select(index, QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows)
-                                
+
                     for row in range(model.rowCount(index)):
                         traverse(model.index(row, 0, index))
-                        
+
                 if selection_model and hasattr(selection_model, 'clearSelection'):
                     selection_model.clearSelection()
                 for row in range(model.rowCount()):
                     traverse(model.index(row, 0))
-                    
+
                 if hasattr(tree_view, 'verticalScrollBar') and tree_view.verticalScrollBar():
                     tree_view.verticalScrollBar().setValue(v_val)
                 if hasattr(tree_view, 'horizontalScrollBar') and tree_view.horizontalScrollBar():
@@ -1454,26 +2120,31 @@ class SuperLayerDockWidget(QDialog):
             if 'Mock' not in type(self.physical_model).__name__:
                 is_first_load = (self.physical_model.rowCount() == 0)
             phys_state = None
-            group_state = None
             if not is_first_load:
                 phys_state = get_tree_state(self.physical_tree_view, self.physical_model)
-                group_state = get_tree_state(self.group_tree_view, self.group_model)
 
             self.update_filter_tags()
             filter_str = self.current_filter_format.lower() if self.current_filter_format else None
-            
+
             # Check if visibility filter is checked
             filter_visible = self.btn_filter_visible.isChecked() if hasattr(self, 'btn_filter_visible') else False
-            
+
+            # A filtered tree does not contain every sibling, so its visible row
+            # positions cannot unambiguously represent the real QGIS layer order.
             # 1. Rebuild physical tree model
-            self.physical_model.rebuild_model(group_by_physical=True, filter_format=filter_str, filter_visible=filter_visible)
-            
-            # 2. Rebuild group tree model
-            self.group_model.rebuild_model(group_by_physical=False, filter_format=filter_str, filter_visible=filter_visible)
-            
+            theme_layer_ids = None
+            if filter_visible and getattr(self, 'current_map_theme', None):
+                theme_layer_ids = self._map_theme_layer_ids(self.current_map_theme)
+            self.physical_model.rebuild_model(
+                group_by_physical=True,
+                filter_format=filter_str,
+                filter_visible=filter_visible and theme_layer_ids is None,
+                filter_layer_ids=theme_layer_ids,
+            )
+
             # 3. Re-apply column widths (model rebuild resets them)
             self._apply_column_widths()
-            
+
             # Make the separator row span across all columns to prevent text truncation
             model = self.physical_model
             for row in range(model.rowCount()):
@@ -1481,13 +2152,12 @@ class SuperLayerDockWidget(QDialog):
                 if item and item.data(Qt.ItemDataRole.UserRole) == "separator":
                     self.physical_tree_view.setFirstColumnSpanned(row, QModelIndex(), True)
                     break
-            
+
             # Restore tree view states
             restore_tree_state(self.physical_tree_view, self.physical_model, phys_state, default_expand_all=True)
-            restore_tree_state(self.group_tree_view, self.group_model, group_state, default_expand_all=False)
-            
+
             layers = self._get_filtered_layers(filter_str)
-            
+
             if self.stacked_widget.currentIndex() == 2:
                 self.treemap_view.set_layers(layers)
             elif self.stacked_widget.currentIndex() == 3:
@@ -1502,11 +2172,18 @@ class SuperLayerDockWidget(QDialog):
     def on_item_double_clicked(self, index):
         if index.column() > 0:
             index = index.sibling(index.row(), 0)
-        
+
         model = self.physical_model
         if hasattr(index, 'model') and index.model():
             model = index.model()
-            
+
+        if isinstance(model, LayerOrderTreeModel):
+            node = model.index2node(index)
+            layer = node.layer() if node and hasattr(node, "layer") else None
+            if layer:
+                self.focus_layer_by_id(layer.id())
+            return
+
         item = model.itemFromIndex(index)
         if isinstance(item, LayerItem):
             self.focus_layer_by_id(item.layer.id())
@@ -1515,14 +2192,14 @@ class SuperLayerDockWidget(QDialog):
         # Prevent recursion during model building/refresh
         if hasattr(self, '_is_refreshing') and self._is_refreshing:
             return
-            
+
         try:
             from .layer_model import LayerItem, FolderItem
         except ImportError:
             from layer_model import LayerItem, FolderItem
-            
+
         new_name = item.text()
-        
+
         if isinstance(item, LayerItem):
             layer = item.layer
             if layer:
@@ -1531,7 +2208,7 @@ class SuperLayerDockWidget(QDialog):
                     layer.setName(new_name)
                     self.refresh()
                     return
-                    
+
                 # 2. Handle CheckState change (Visibility)
                 try:
                     project = QgsProject.instance()
@@ -1544,7 +2221,7 @@ class SuperLayerDockWidget(QDialog):
                 except Exception as e:
                     import logging
                     logging.getLogger(__name__).debug("Failed to set layer tree visibility: %s", e)
-                    
+
         elif isinstance(item, FolderItem):
             if not new_name:
                 return
@@ -1570,8 +2247,14 @@ class SuperLayerDockWidget(QDialog):
         for idx in view.selectionModel().selectedIndexes():
             if idx.column() > 0:
                 continue
-            
+
             model = view.model()
+            if isinstance(model, LayerOrderTreeModel):
+                node = model.index2node(idx)
+                layer = node.layer() if node and hasattr(node, "layer") else None
+                if layer:
+                    layers.append(layer)
+                continue
             item = model.itemFromIndex(idx)
             if item and isinstance(item, LayerItem):
                 layers.append(item.layer)
@@ -1594,7 +2277,7 @@ class SuperLayerDockWidget(QDialog):
                         actual_path = resolve_physical_path(phys_path)
                         if actual_path:
                             folder_path = os.path.dirname(actual_path)
-                    
+
                     if folder_path:
                         self._create_folder_context_menu(folder_path, self.physical_tree_view.mapToGlobal(pos), folder_item=item if isinstance(item, FolderItem) else None)
                 elif isinstance(item, LayerItem):
@@ -1617,6 +2300,32 @@ class SuperLayerDockWidget(QDialog):
         if idx.isValid():
             model = self.group_tree_view.model()
             col0_idx = idx.sibling(idx.row(), 0)
+            if isinstance(model, LayerOrderTreeModel):
+                node = model.index2node(col0_idx)
+                layer = node.layer() if node and hasattr(node, "layer") else None
+                if layer:
+                    layers = []
+                    selection_model = self.group_tree_view.selectionModel()
+                    selected = selection_model.selectedIndexes() if selection_model else []
+                    for selected_index in selected:
+                        if selected_index.column() != 0:
+                            continue
+                        selected_node = model.index2node(selected_index)
+                        selected_layer = (
+                            selected_node.layer()
+                            if selected_node and hasattr(selected_node, "layer") else None
+                        )
+                        if selected_layer and selected_layer not in layers:
+                            layers.append(selected_layer)
+                    if layer not in layers:
+                        layers = [layer]
+                    self._create_layer_context_menu(layers, self.group_tree_view.mapToGlobal(pos))
+                elif node and hasattr(node, "children"):
+                    folder_item = FolderItem(node.name(), is_physical=False, group_node=node)
+                    self._create_folder_context_menu(
+                        node.name(), self.group_tree_view.mapToGlobal(pos), folder_item=folder_item
+                    )
+                return
             item = model.itemFromIndex(col0_idx)
             if item:
                 if idx.column() == 2 or isinstance(item, FolderItem):
@@ -1629,7 +2338,7 @@ class SuperLayerDockWidget(QDialog):
                         actual_path = resolve_physical_path(phys_path)
                         if actual_path:
                             folder_path = os.path.dirname(actual_path)
-                    
+
                     if folder_path:
                         self._create_folder_context_menu(folder_path, self.group_tree_view.mapToGlobal(pos), folder_item=item if isinstance(item, FolderItem) else None)
                 elif isinstance(item, LayerItem):
@@ -1662,7 +2371,7 @@ class SuperLayerDockWidget(QDialog):
                         layers.append(item.node.layer)
         if not layers and node.layer:
             layers = [node.layer]
-            
+
         if layers:
             self._create_layer_context_menu(layers, global_pos)
         elif node.is_physical_folder and node.path:
@@ -1670,13 +2379,13 @@ class SuperLayerDockWidget(QDialog):
 
     def _create_folder_context_menu(self, folder_path, global_pos, folder_item=None):
         is_logical = folder_item is not None and not getattr(folder_item, 'is_physical', True)
-        
+
         actual_path = None
         if not is_logical:
             actual_path = resolve_physical_path(folder_path)
             if not actual_path or not os.path.exists(actual_path):
                 return
-                
+
         menu = QMenu(self)
         menu.setStyleSheet("""
             QMenu {
@@ -1697,10 +2406,10 @@ class SuperLayerDockWidget(QDialog):
                 color: #ffffff;
             }
         """)
-        
+
         plugin_dir = os.path.dirname(os.path.abspath(__file__))
         zoom_icon_path = os.path.join(plugin_dir, "icons_component", "Zoom_to_Layer.svg")
-        
+
         if is_logical:
             act_zoom = menu.addAction(tr("缩放到图层组"))
             if os.path.exists(zoom_icon_path):
@@ -1711,32 +2420,32 @@ class SuperLayerDockWidget(QDialog):
             if os.path.exists(zoom_icon_path):
                 act_zoom.setIcon(QIcon(zoom_icon_path))
             act_zoom.triggered.connect(lambda: self.action_zoom_to_folder(folder_path, folder_item))
-            
+
             menu.addSeparator()
-            
+
             act_open_folder = menu.addAction(tr("打开文件夹位置"))
             open_icon_path = os.path.join(plugin_dir, "icons_component", "Open_File_Location.svg")
             if os.path.exists(open_icon_path):
                 act_open_folder.setIcon(QIcon(open_icon_path))
-                
+
             act_copy_link = menu.addAction(tr("复制文件夹链接"))
             copy_icon_path = os.path.join(plugin_dir, "icons_component", "Copy_Folder_Link.svg")
             if os.path.exists(copy_icon_path):
                 act_copy_link.setIcon(QIcon(copy_icon_path))
-                
+
             act_rename_folder = menu.addAction(tr("重命名文件夹"))
             rename_icon_path = os.path.join(plugin_dir, "icons_component", "Renamed_parent_folder.svg")
             if os.path.exists(rename_icon_path):
                 act_rename_folder.setIcon(QIcon(rename_icon_path))
-                
+
             act_migrate_folder = menu.addAction(tr("迁移文件夹"))
             migrate_icon_path = os.path.join(plugin_dir, "icons_component", "Move_Folder.svg")
             if os.path.exists(migrate_icon_path):
                 act_migrate_folder.setIcon(QIcon(migrate_icon_path))
-                
+
             def on_open():
                 try:
-                    import subprocess  # noqa: PLC0415
+                    import subprocess  # noqa: PLC0415  # nosec B404
                     norm_path = os.path.normpath(actual_path)
                     if os.name == 'nt':
                         explorer_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'explorer.exe')
@@ -1754,7 +2463,7 @@ class SuperLayerDockWidget(QDialog):
                             subprocess.Popen([opener, os.path.dirname(norm_path)])  # nosec B603 B607
                 except Exception as e:
                     QMessageBox.warning(self, tr("操作失败"), tr("打开文件夹失败: {}").format(str(e)))
-                    
+
             def on_copy():
                 try:
                     from qgis.PyQt.QtWidgets import QApplication
@@ -1766,9 +2475,9 @@ class SuperLayerDockWidget(QDialog):
             def on_rename():
                 old_name = os.path.basename(actual_path)
                 new_name, ok = QInputDialog.getText(
-                    self, 
-                    tr("重命名文件夹"), 
-                    tr("新文件夹名:"), 
+                    self,
+                    tr("重命名文件夹"),
+                    tr("新文件夹名:"),
                     text=old_name
                 )
                 if ok and new_name and new_name != old_name:
@@ -1778,7 +2487,7 @@ class SuperLayerDockWidget(QDialog):
                             self.refresh()
                     except Exception as e:
                         QMessageBox.warning(self, tr("操作失败"), tr("重命名文件夹失败: {}").format(str(e)))
-                        
+
             def on_migrate():
                 initial_dir = os.path.dirname(actual_path) if actual_path else ""
                 target_parent_dir = QFileDialog.getExistingDirectory(self, tr("选择迁移目标文件夹"), initial_dir)
@@ -1789,12 +2498,12 @@ class SuperLayerDockWidget(QDialog):
                             self.refresh()
                     except Exception as e:
                         QMessageBox.warning(self, tr("操作失败"), tr("迁移文件夹失败: {}").format(str(e)))
-                        
+
             act_open_folder.triggered.connect(on_open)
             act_copy_link.triggered.connect(on_copy)
             act_rename_folder.triggered.connect(on_rename)
             act_migrate_folder.triggered.connect(on_migrate)
-            
+
         menu.exec(global_pos)
 
     def handle_layer_relocation(self, layer_id, target_folder_path):
@@ -1803,21 +2512,21 @@ class SuperLayerDockWidget(QDialog):
             layer = project.mapLayer(layer_id)
         except Exception:
             layer = None
-            
+
         if not layer:
             QMessageBox.warning(self, tr("移动失败"), tr("未找到指定的图层，无法进行文件移动。"))
             return
-            
+
         layer_name = layer.name()
-        
+
         if hasattr(layer, 'isEditable') and layer.isEditable():
             QMessageBox.warning(
-                self, 
-                tr("操作被拦截"), 
+                self,
+                tr("操作被拦截"),
                 tr("图层【{}】目前处于编辑状态。\n请先在 QGIS 中保存编辑并关闭编辑模式，然后再尝试操作。").format(layer_name)
             )
             return
-            
+
         source_path = layer.source()
         phys_source_path, query_params = split_qgis_source(source_path)
         actual_source_path = resolve_physical_path(phys_source_path)
@@ -1830,17 +2539,17 @@ class SuperLayerDockWidget(QDialog):
         file_list_str = "\n".join([f"  • {os.path.basename(f)}" for f in files if os.path.exists(f)])
         if not file_list_str:
             file_list_str = f"  • {os.path.basename(phys_source_path)}"
-            
+
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle(tr("选择操作"))
         msg_box.setText(tr("拖拽图层【{}】到该目录，请选择要执行的操作：\n\n涉及物理文件：\n{}").format(layer_name, file_list_str))
-        
+
         plugin_dir = os.path.dirname(os.path.abspath(__file__))
         icons_dir = os.path.join(plugin_dir, "icons_component")
         icon_move = QIcon(os.path.join(icons_dir, "Move_File.svg"))
         icon_copy = QIcon(os.path.join(icons_dir, "Copy_to_new_folder.svg"))
         icon_backup = QIcon(os.path.join(icons_dir, "Backup_to_new_folder.svg"))
-        
+
         btn_move = msg_box.addButton(tr("移动"), QMessageBox.ButtonRole.ActionRole)
         btn_move.setIcon(icon_move)
         btn_copy = msg_box.addButton(tr("复制"), QMessageBox.ButtonRole.ActionRole)
@@ -1849,34 +2558,34 @@ class SuperLayerDockWidget(QDialog):
         btn_backup.setIcon(icon_backup)
         btn_cancel = msg_box.addButton(tr("取消"), QMessageBox.ButtonRole.RejectRole)
         btn_cancel.setStyleSheet("background-color: #cccccc; min-width: 60px;")
-        
+
         msg_box.exec()
         clicked = msg_box.clickedButton()
-        
+
         if clicked == btn_cancel:
             return
-            
+
         if clicked == btn_move:
             source_dir = os.path.dirname(actual_source_path)
-            
+
             if os.path.normcase(os.path.abspath(source_dir)) == os.path.normcase(os.path.abspath(target_folder_path)):
                 return
-                
+
             files = get_associated_files(phys_source_path)
             conflict_files = []
             for src in files:
                 dest = os.path.join(target_folder_path, os.path.basename(src))
                 if os.path.exists(dest):
                     conflict_files.append(os.path.basename(src))
-                    
+
             if conflict_files:
                 QMessageBox.warning(
-                    self, 
-                    tr("移动冲突"), 
+                    self,
+                    tr("移动冲突"),
                     tr("目标文件夹已存在以下同名文件：\n{} \n\n操作已被取消，请先清理或重命名冲突文件。").format("\n".join(conflict_files))
                 )
                 return
-                
+
             file_size_text = ""
             try:
                 total_size = sum(os.path.getsize(f) for f in files if os.path.exists(f))
@@ -1884,7 +2593,7 @@ class SuperLayerDockWidget(QDialog):
             except Exception as e:  # noqa: BLE001
                 import logging
                 logging.getLogger(__name__).debug("Failed to calculate total size: %s", e)
-                
+
             confirm_msg = (
                 tr("确定要物理移动图层【{}】的文件吗？").format(layer_name) + "\n\n" +
                 tr("源目录: {}").format(source_dir) + "\n" +
@@ -1892,15 +2601,15 @@ class SuperLayerDockWidget(QDialog):
                 tr("伴生文件数量: {} {}").format(len(files), file_size_text) + "\n\n" +
                 tr("此操作将直接修改磁盘物理文件路径并更新 QGIS 数据源链接。")
             )
-            
+
             reply = QMessageBox.question(
-                self, 
-                tr("确认物理移动文件"), 
-                confirm_msg, 
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, 
+                self,
+                tr("确认物理移动文件"),
+                confirm_msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
             )
-            
+
             if reply == QMessageBox.StandardButton.Yes:
                 try:
                     success = safe_move(layer, target_folder_path)
@@ -1920,22 +2629,22 @@ class SuperLayerDockWidget(QDialog):
                     dest = os.path.join(target_folder_path, os.path.basename(src))
                     if os.path.exists(dest):
                         conflict_files.append(os.path.basename(src))
-                        
+
                 if conflict_files:
                     QMessageBox.warning(
-                        self, 
-                        tr("复制冲突"), 
+                        self,
+                        tr("复制冲突"),
                         tr("目标文件夹已存在以下同名文件：\n{} \n\n操作已被取消，请先清理或重命名冲突文件。").format("\n".join(conflict_files))
                     )
                     return
-                
+
                 # Copy files
                 safe_copy(source_path, target_folder_path)
-                
+
                 # Load new layer in QGIS
                 new_path = os.path.join(target_folder_path, os.path.basename(phys_source_path))
                 new_layer = None
-                
+
                 if isinstance(layer, QgsVectorLayer):
                     new_layer = QgsVectorLayer(new_path, tr("{} (复制)").format(layer.name()), layer.dataProvider().name())
                 elif isinstance(layer, QgsRasterLayer):
@@ -1949,13 +2658,10 @@ class SuperLayerDockWidget(QDialog):
                         new_layer = QgsRasterLayer(new_path, tr("{} (复制)").format(layer.name()), "gdal")
 
                 if new_layer and new_layer.isValid():
+                    layer_style = self._capture_layer_style(layer)
+                    self._apply_layer_style(layer_style, new_layer)
                     QgsProject.instance().addMapLayer(new_layer)
-                    if hasattr(layer, 'renderer') and layer.renderer() and hasattr(new_layer, 'setRenderer'):
-                        new_layer.setRenderer(layer.renderer().clone())
-                    if hasattr(layer, 'labeling') and layer.labeling() and hasattr(new_layer, 'setLabeling'):
-                        new_layer.setLabeling(layer.labeling().clone())
-                    new_layer.triggerRepaint()
-                
+
                 self.refresh()
                 QMessageBox.information(self, tr("复制成功"), tr("图层【{}】已成功复制并加载到当前工程。").format(layer_name))
             except Exception as e:
@@ -1969,38 +2675,103 @@ class SuperLayerDockWidget(QDialog):
                     dest = os.path.join(target_folder_path, os.path.basename(src))
                     if os.path.exists(dest):
                         conflict_files.append(os.path.basename(src))
-                        
+
                 if conflict_files:
                     QMessageBox.warning(
-                        self, 
-                        tr("备份冲突"), 
+                        self,
+                        tr("备份冲突"),
                         tr("目标文件夹已存在以下同名文件：\n{} \n\n操作已被取消，请先清理或重命名冲突文件。").format("\n".join(conflict_files))
                     )
                     return
-                
+
                 # Copy files
                 safe_copy(source_path, target_folder_path)
-                
+
                 self.refresh()
                 QMessageBox.information(self, tr("备份成功"), tr("图层【{}】物理文件已成功备份至目标目录。").format(layer_name))
             except Exception as e:
                 QMessageBox.warning(self, tr("操作失败"), tr("备份文件失败: {}").format(str(e)))
 
+    def handle_group_reorder(self, dragged_items, target_info, position):
+        """Submit a complete sibling-layer order through QGIS' group API."""
+        if (not dragged_items or not target_info or
+                target_info.get("type") != "layer" or
+                position not in ("above", "below")):
+            return
+
+        try:
+            project = QgsProject.instance()
+            if not project or not project.layerTreeRoot():
+                return
+            root = project.layerTreeRoot()
+        except Exception:
+            return
+
+        target_node = root.findLayer(target_info.get("id"))
+        if not target_node:
+            return
+
+        target_parent = target_node.parent()
+        if not target_parent:
+            return
+
+        # Resolve all sources before changing the order. Groups and cross-group
+        # moves are deliberately unsupported.
+        source_nodes = []
+        for item_data in dragged_items:
+            if item_data.get("type") != "layer":
+                return
+            source_node = root.findLayer(item_data.get("id"))
+            if not source_node or source_node.parent() != target_parent:
+                return
+            if source_node not in source_nodes:
+                source_nodes.append(source_node)
+
+        if len(source_nodes) != 1 or target_node in source_nodes:
+            return
+
+        try:
+            children = target_parent.children()
+            # reorderGroupLayers() intentionally places non-layer children after
+            # layers. Refuse mixed groups so subgroup positions never change.
+            ordered_layers = []
+            for child in children:
+                layer = child.layer() if hasattr(child, "layer") else None
+                if not layer:
+                    return
+                ordered_layers.append(layer)
+
+            source_layer = source_nodes[0].layer()
+            target_layer = target_node.layer()
+            if not source_layer or not target_layer:
+                return
+
+            ordered_layers.remove(source_layer)
+            target_index = ordered_layers.index(target_layer)
+            if position == "below":
+                target_index += 1
+            ordered_layers.insert(target_index, source_layer)
+            target_parent.reorderGroupLayers(ordered_layers)
+            self._refresh_timer.start()
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Failed to reorder sibling layers: %s", e)
+
     def handle_multiple_layers_relocation(self, layer_ids, target_folder_path):
         project = QgsProject.instance()
         if not project:
             return
-            
+
         layers_to_move = []
         for lid in layer_ids:
             layer = project.mapLayer(lid)
             if layer:
                 layers_to_move.append(layer)
-                
+
         if not layers_to_move:
             return
-            
-        editing_names = [l.name() for l in layers_to_move if hasattr(l, 'isEditable') and l.isEditable()]
+
+        editing_names = [layer.name() for layer in layers_to_move if hasattr(layer, 'isEditable') and layer.isEditable()]
         if editing_names:
             QMessageBox.warning(
                 self,
@@ -2008,12 +2779,12 @@ class SuperLayerDockWidget(QDialog):
                 tr("以下图层处于编辑状态，请保存并关闭编辑模式后再尝试操作：\n{}").format("\n".join(editing_names))
             )
             return
-            
+
         actual_target = resolve_physical_path(target_folder_path)
         if not actual_target or not os.path.exists(actual_target) or not os.path.isdir(actual_target):
             QMessageBox.warning(self, tr("操作失败"), tr("未找到合法的目标文件夹物理路径。"))
             return
-            
+
         all_src_files = []
         layer_file_map = {}
         for layer in layers_to_move:
@@ -2023,15 +2794,15 @@ class SuperLayerDockWidget(QDialog):
             if not actual_source_path or not os.path.exists(actual_source_path):
                 QMessageBox.warning(self, tr("操作失败"), tr("未找到图层【{}】的源文件。").format(layer.name()))
                 return
-            
+
             source_dir = os.path.dirname(actual_source_path)
             if os.path.normcase(os.path.abspath(source_dir)) == os.path.normcase(os.path.abspath(actual_target)):
                 continue
-                
+
             files = get_associated_files(phys_source_path)
             all_src_files.extend(files)
             layer_file_map[layer.id()] = (layer, files, phys_source_path, query_params)
-            
+
         if not layer_file_map:
             return
 
@@ -2039,17 +2810,17 @@ class SuperLayerDockWidget(QDialog):
         file_list_str = "\n".join([f"  • {os.path.basename(f)}" for f in all_src_files if os.path.exists(f)])
         if not file_list_str:
             file_list_str = tr("（未找到有效的物理文件）")
-            
+
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle(tr("选择操作"))
         msg_box.setText(tr("拖拽选中的 {} 个图层到该目录，请选择要执行的操作：\n\n涉及物理文件：\n{}").format(len(layer_file_map), file_list_str))
-        
+
         plugin_dir = os.path.dirname(os.path.abspath(__file__))
         icons_dir = os.path.join(plugin_dir, "icons_component")
         icon_move = QIcon(os.path.join(icons_dir, "Move_File.svg"))
         icon_copy = QIcon(os.path.join(icons_dir, "Copy_to_new_folder.svg"))
         icon_backup = QIcon(os.path.join(icons_dir, "Backup_to_new_folder.svg"))
-        
+
         btn_move = msg_box.addButton(tr("移动"), QMessageBox.ButtonRole.ActionRole)
         btn_move.setIcon(icon_move)
         btn_copy = msg_box.addButton(tr("复制"), QMessageBox.ButtonRole.ActionRole)
@@ -2058,28 +2829,28 @@ class SuperLayerDockWidget(QDialog):
         btn_backup.setIcon(icon_backup)
         btn_cancel = msg_box.addButton(tr("取消"), QMessageBox.ButtonRole.RejectRole)
         btn_cancel.setStyleSheet("background-color: #cccccc; min-width: 60px;")
-        
+
         msg_box.exec()
         clicked = msg_box.clickedButton()
-        
+
         if clicked == btn_cancel:
             return
-            
+
         if clicked == btn_move:
             conflict_files = []
             for src in all_src_files:
                 dest = os.path.join(actual_target, os.path.basename(src))
                 if os.path.exists(dest):
                     conflict_files.append(os.path.basename(src))
-                    
+
             if conflict_files:
                 QMessageBox.warning(
-                    self, 
-                    tr("移动冲突"), 
+                    self,
+                    tr("移动冲突"),
                     tr("目标文件夹已存在以下同名文件：\n{} \n\n操作已被取消。").format("\n".join(conflict_files))
                 )
                 return
-                
+
             file_size_text = ""
             try:
                 total_size = sum(os.path.getsize(f) for f in all_src_files if os.path.exists(f))
@@ -2087,22 +2858,22 @@ class SuperLayerDockWidget(QDialog):
             except Exception as e:  # noqa: BLE001
                 import logging
                 logging.getLogger(__name__).debug("Failed to calculate total size: %s", e)
-                
+
             confirm_msg = (
                 tr("确定要物理移动选中的这 {} 个图层的文件吗？").format(len(layer_file_map)) + "\n\n" +
                 tr("目标目录: {}").format(actual_target) + "\n" +
                 tr("伴生文件数量: {} {}").format(len(all_src_files), file_size_text) + "\n\n" +
                 tr("此操作将直接修改磁盘物理文件路径并更新 QGIS 数据源链接。")
             )
-            
+
             reply = QMessageBox.question(
-                self, 
-                tr("确认物理移动文件"), 
-                confirm_msg, 
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, 
+                self,
+                tr("确认物理移动文件"),
+                confirm_msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
             )
-            
+
             if reply == QMessageBox.StandardButton.Yes:
                 success_count = 0
                 failed_layers = []
@@ -2115,14 +2886,14 @@ class SuperLayerDockWidget(QDialog):
                             failed_layers.append(layer.name())
                     except Exception as e:
                         failed_layers.append(f"{layer.name()} ({str(e)})")
-                
+
                 self.refresh()
                 if not failed_layers:
                     QMessageBox.information(self, tr("移动成功"), tr("成功将 {} 个图层的文件移动到新目录。").format(success_count))
                 else:
                     QMessageBox.critical(
-                        self, 
-                        tr("部分移动失败"), 
+                        self,
+                        tr("部分移动失败"),
                         tr("成功移动了 {} 个图层，但以下图层移动失败：\n{}").format(success_count, "\n".join(failed_layers))
                     )
 
@@ -2133,22 +2904,22 @@ class SuperLayerDockWidget(QDialog):
                     dest = os.path.join(actual_target, os.path.basename(src))
                     if os.path.exists(dest):
                         conflict_files.append(os.path.basename(src))
-                        
+
                 if conflict_files:
                     QMessageBox.warning(
-                        self, 
-                        tr("复制冲突"), 
+                        self,
+                        tr("复制冲突"),
                         tr("目标文件夹已存在以下同名文件：\n{} \n\n操作已被取消。").format("\n".join(conflict_files))
                     )
                     return
-                
+
                 for lid, (layer, files, phys_source_path, query_params) in layer_file_map.items():
                     # Copy files
                     safe_copy(layer.source(), actual_target)
                     # Load new layer in QGIS
                     new_path = os.path.join(actual_target, os.path.basename(layer.source()))
                     new_layer = None
-                    
+
                     if isinstance(layer, QgsVectorLayer):
                         new_layer = QgsVectorLayer(new_path, tr("{} (复制)").format(layer.name()), layer.dataProvider().name())
                     elif isinstance(layer, QgsRasterLayer):
@@ -2162,12 +2933,13 @@ class SuperLayerDockWidget(QDialog):
                             new_layer = QgsRasterLayer(new_path, tr("{} (复制)").format(layer.name()), "gdal")
 
                     if new_layer and new_layer.isValid():
+                        layer_style = self._capture_layer_style(layer)
+                        self._apply_layer_style(layer_style, new_layer)
+                        if isinstance(new_layer, QgsVectorLayer) and hasattr(layer, "subsetString"):
+                            # Provider subset filters are datasource state, not part of
+                            # QgsMapLayerStyle, so copy them explicitly.
+                            new_layer.setSubsetString(layer.subsetString())
                         QgsProject.instance().addMapLayer(new_layer)
-                        if hasattr(layer, 'renderer') and layer.renderer() and hasattr(new_layer, 'setRenderer'):
-                            new_layer.setRenderer(layer.renderer().clone())
-                        if hasattr(layer, 'labeling') and layer.labeling() and hasattr(new_layer, 'setLabeling'):
-                            new_layer.setLabeling(layer.labeling().clone())
-                        new_layer.triggerRepaint()
                 self.refresh()
                 QMessageBox.information(self, tr("复制成功"), tr("成功复制并加载了 {} 个图层。").format(len(layer_file_map)))
             except Exception as e:
@@ -2180,15 +2952,15 @@ class SuperLayerDockWidget(QDialog):
                     dest = os.path.join(actual_target, os.path.basename(src))
                     if os.path.exists(dest):
                         conflict_files.append(os.path.basename(src))
-                        
+
                 if conflict_files:
                     QMessageBox.warning(
-                        self, 
-                        tr("备份冲突"), 
+                        self,
+                        tr("备份冲突"),
                         tr("目标文件夹已存在以下同名文件：\n{} \n\n操作已被取消。").format("\n".join(conflict_files))
                     )
                     return
-                
+
                 for lid, (layer, files, phys_source_path, query_params) in layer_file_map.items():
                     # Copy files
                     safe_copy(layer.source(), actual_target)
@@ -2201,35 +2973,35 @@ class SuperLayerDockWidget(QDialog):
         import shutil
         actual_source = resolve_physical_path(source_folder_path)
         actual_target = resolve_physical_path(target_folder_path)
-        
+
         if not actual_source or not os.path.exists(actual_source):
             QMessageBox.warning(self, tr("操作失败"), tr("未找到源文件夹/容器物理路径。"))
             return
-            
+
         if not actual_target or not os.path.exists(actual_target):
             QMessageBox.warning(self, tr("操作失败"), tr("未找到目标文件夹物理路径。"))
             return
-            
+
         if not os.path.isdir(actual_target):
             QMessageBox.warning(self, tr("操作失败"), tr("目标路径必须是文件夹。"))
             return
-            
+
         new_path = os.path.join(actual_target, os.path.basename(actual_source)).replace('\\', '/')
-        
+
         if os.path.normcase(os.path.abspath(actual_source)) == os.path.normcase(os.path.abspath(new_path)):
             return
-            
+
         if os.path.isdir(actual_source):
             norm_source = os.path.normcase(os.path.abspath(actual_source)).replace('\\', '/')
             norm_target = os.path.normcase(os.path.abspath(actual_target)).replace('\\', '/')
             if norm_target == norm_source or norm_target.startswith(norm_source + '/'):
                 QMessageBox.warning(self, tr("移动失败"), tr("不能将文件夹移动到自身或其子文件夹下。"))
                 return
-                
+
         if os.path.exists(new_path):
             QMessageBox.warning(self, tr("移动冲突"), tr("目标文件夹中已存在同名文件夹或文件：\n{}").format(os.path.basename(actual_source)))
             return
-            
+
         # Identify layers in the project under this directory
         project = QgsProject.instance()
         layers_under = []
@@ -2239,32 +3011,32 @@ class SuperLayerDockWidget(QDialog):
                 norm_parent = os.path.normcase(os.path.abspath(parent))
                 return norm_p == norm_parent or norm_p.startswith(norm_parent + os.sep) or norm_p.replace('\\', '/').startswith(norm_parent.replace('\\', '/') + '/')
 
-            for l_id, l in project.mapLayers().items():
-                if l and l.source():
-                    p_path, q_params = split_qgis_source(l.source())
+            for layer_id, layer in project.mapLayers().items():
+                if layer and layer.source():
+                    p_path, q_params = split_qgis_source(layer.source())
                     actual_p_path = resolve_physical_path(p_path)
                     if is_under_or_equal(actual_p_path, actual_source):
-                        layers_under.append(l)
+                        layers_under.append(layer)
 
         # Pop up selection dialog with Move, Copy, Backup options
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle(tr("选择操作"))
-        
+
         info_text = tr("拖拽文件夹【{}】到该目录，请选择要执行的操作：\n\n源路径：{}\n目标目录：{}").format(
             os.path.basename(actual_source), actual_source, actual_target
         )
         if layers_under:
-            layers_str = "\n".join([f"  • {l.name()}" for l in layers_under])
+            layers_str = "\n".join([f"  • {layer.name()}" for layer in layers_under])
             info_text += tr("\n\n关联的图层：\n{}").format(layers_str)
-            
+
         msg_box.setText(info_text)
-        
+
         plugin_dir = os.path.dirname(os.path.abspath(__file__))
         icons_dir = os.path.join(plugin_dir, "icons_component")
         icon_move = QIcon(os.path.join(icons_dir, "Move_File.svg"))
         icon_copy = QIcon(os.path.join(icons_dir, "Copy_to_new_folder.svg"))
         icon_backup = QIcon(os.path.join(icons_dir, "Backup_to_new_folder.svg"))
-        
+
         btn_move = msg_box.addButton(tr("移动"), QMessageBox.ButtonRole.ActionRole)
         btn_move.setIcon(icon_move)
         btn_copy = msg_box.addButton(tr("复制"), QMessageBox.ButtonRole.ActionRole)
@@ -2273,13 +3045,13 @@ class SuperLayerDockWidget(QDialog):
         btn_backup.setIcon(icon_backup)
         btn_cancel = msg_box.addButton(tr("取消"), QMessageBox.ButtonRole.RejectRole)
         btn_cancel.setStyleSheet("background-color: #cccccc; min-width: 60px;")
-        
+
         msg_box.exec()
         clicked = msg_box.clickedButton()
-        
+
         if clicked == btn_cancel:
             return
-            
+
         if clicked == btn_move:
             try:
                 success = safe_migrate_dir(actual_source, actual_target)
@@ -2290,7 +3062,7 @@ class SuperLayerDockWidget(QDialog):
                     QMessageBox.critical(self, tr("移动失败"), tr("在拷贝或移动文件夹/容器时发生未知错误。"))
             except Exception as e:
                 QMessageBox.critical(self, tr("移动失败"), tr("移动发生异常错误：\n{}").format(str(e)))
-                
+
         elif clicked == btn_copy:
             try:
                 if os.path.isdir(actual_source):
@@ -2309,19 +3081,19 @@ class SuperLayerDockWidget(QDialog):
                             except Exception as e:  # noqa: BLE001
                                 import logging
                                 logging.getLogger(__name__).debug("Failed to copy sidecar file: %s", e)
-                                
+
                 # Load the copied layers
                 for layer in layers_under:
                     source_path = layer.source()
                     phys_source_path, query_params = split_qgis_source(source_path)
                     actual_p_path = resolve_physical_path(phys_source_path)
-                    
+
                     if os.path.isdir(actual_source):
                         rel_path = os.path.relpath(phys_source_path, actual_source)
                         new_l_path = os.path.normpath(os.path.join(new_path, rel_path)).replace('\\', '/')
                     else:
                         new_l_path = new_path
-                        
+
                     new_layer = None
                     if isinstance(layer, QgsVectorLayer):
                         new_layer = QgsVectorLayer(new_l_path + query_params, tr("{} (复制)").format(layer.name()), layer.dataProvider().name())
@@ -2336,18 +3108,15 @@ class SuperLayerDockWidget(QDialog):
                             new_layer = QgsRasterLayer(new_l_path + query_params, tr("{} (复制)").format(layer.name()), "gdal")
 
                     if new_layer and new_layer.isValid():
+                        layer_style = self._capture_layer_style(layer)
+                        self._apply_layer_style(layer_style, new_layer)
                         QgsProject.instance().addMapLayer(new_layer)
-                        if hasattr(layer, 'renderer') and layer.renderer() and hasattr(new_layer, 'setRenderer'):
-                            new_layer.setRenderer(layer.renderer().clone())
-                        if hasattr(layer, 'labeling') and layer.labeling() and hasattr(new_layer, 'setLabeling'):
-                            new_layer.setLabeling(layer.labeling().clone())
-                        new_layer.triggerRepaint()
-                        
+
                 self.refresh()
                 QMessageBox.information(self, tr("复制成功"), tr("文件夹/容器复制成功，并已加载其下图层。"))
             except Exception as e:
                 QMessageBox.critical(self, tr("复制失败"), tr("复制发生异常错误：\n{}").format(str(e)))
-                
+
         elif clicked == btn_backup:
             try:
                 if os.path.isdir(actual_source):
@@ -2366,7 +3135,7 @@ class SuperLayerDockWidget(QDialog):
                             except Exception as e:  # noqa: BLE001
                                 import logging
                                 logging.getLogger(__name__).debug("Failed to copy sidecar file: %s", e)
-                                
+
                 self.refresh()
                 QMessageBox.information(self, tr("备份成功"), tr("文件夹/容器备份成功。"))
             except Exception as e:
@@ -2393,21 +3162,21 @@ class SuperLayerDockWidget(QDialog):
                 color: #ffffff;
             }
         """)
-        
+
         plugin_dir = os.path.dirname(os.path.abspath(__file__))
         icons_dir = os.path.join(plugin_dir, "icons_component")
-        
+
         def set_icon(item, svg_name):
             icon_path = os.path.join(icons_dir, svg_name)
             if os.path.exists(icon_path):
                 item.setIcon(QIcon(icon_path))
-                
+
         def set_panel_icon(item, svg_name):
             panel_icons_dir = os.path.join(plugin_dir, "icons_panel")
             icon_path = os.path.join(panel_icons_dir, svg_name)
             if os.path.exists(icon_path):
                 item.setIcon(QIcon(icon_path))
-        
+
         # Single layer actions
         if len(layers) == 1:
             layer = layers[0]
@@ -2415,13 +3184,13 @@ class SuperLayerDockWidget(QDialog):
                 from .layer_model import is_layer_visible
             except ImportError:
                 from layer_model import is_layer_visible
-                
+
             visible = is_layer_visible(layer)
             if visible:
                 act_hide = menu.addAction(tr("隐藏图层"))
                 act_hide.triggered.connect(lambda: self.action_set_layers_visibility([layer], False))
                 set_icon(act_hide, "Component_layer_hide.svg")
-                
+
                 act_show = menu.addAction(tr("显示图层"))
                 act_show.triggered.connect(lambda: self.action_set_layers_visibility([layer], True))
                 set_icon(act_show, "Component_layer_show.svg")
@@ -2429,47 +3198,47 @@ class SuperLayerDockWidget(QDialog):
                 act_show = menu.addAction(tr("显示图层"))
                 act_show.triggered.connect(lambda: self.action_set_layers_visibility([layer], True))
                 set_icon(act_show, "Component_layer_show.svg")
-                
+
                 act_hide = menu.addAction(tr("隐藏图层"))
                 act_hide.triggered.connect(lambda: self.action_set_layers_visibility([layer], False))
                 set_icon(act_hide, "Component_layer_hide.svg")
-            
+
             menu.addSeparator()
-            
+
             is_memory = False
             if hasattr(layer, 'dataProvider') and layer.dataProvider() and hasattr(layer.dataProvider(), 'name'):
                 is_memory = (layer.dataProvider().name() == "memory")
-                
+
             if is_memory:
                 act_zoom = menu.addAction(tr("缩放到图层"))
                 act_zoom.triggered.connect(lambda: self.action_zoom_to_layers([layer]))
                 set_icon(act_zoom, "Zoom_to_Layer.svg")
-                
+
                 act_export_temp = menu.addAction(tr("保存临时图层"))
                 act_export_temp.triggered.connect(lambda: self.action_export_temporary_layer(layer))
                 set_icon(act_export_temp, "Save_Temporary_Layer.svg")
-                
+
                 menu.addSeparator()
-                
+
                 edit_menu = menu.addMenu(tr("图层编辑"))
                 set_icon(edit_menu, "Layer_Editing.svg")
-                
+
                 if isinstance(layer, QgsVectorLayer):
                     pencil_label = tr("停止编辑") if layer.isEditable() else tr("开始编辑")
                     act_toggle_edit = edit_menu.addAction(pencil_label)
                     act_toggle_edit.triggered.connect(lambda: self.action_toggle_edit(layer))
                     set_icon(act_toggle_edit, "Start_Editing.svg")
-                
+
                 act_rename_layer = edit_menu.addAction(tr("重命名图层"))
                 act_rename_layer.triggered.connect(lambda: self.action_rename_layer(layer))
                 set_icon(act_rename_layer, "Rename_Layer.svg")
-                
+
                 if isinstance(layer, QgsVectorLayer):
                     act_open_attrs = edit_menu.addAction(tr("打开属性表"))
                     act_open_attrs.triggered.connect(lambda: self.action_open_attribute_table(layer))
                     act_open_attrs.setToolTip(tr("重新加载到QGIS时候自动以新的文件名加载"))
                     set_icon(act_open_attrs, "Open_Property_Table.svg")
-                
+
                 act_properties = edit_menu.addAction(tr("打开图层属性"))
                 act_properties.triggered.connect(lambda: self.action_open_properties(layer))
                 set_icon(act_properties, "Open_Layer_Properties.svg")
@@ -2477,24 +3246,24 @@ class SuperLayerDockWidget(QDialog):
                 act_zoom = menu.addAction(tr("缩放到图层"))
                 act_zoom.triggered.connect(lambda: self.action_zoom_to_layers([layer]))
                 set_icon(act_zoom, "Zoom_to_Layer.svg")
-                
+
                 menu.addSeparator()
-                
+
                 act_datasource = menu.addAction(tr("更换数据源"))
                 act_datasource.triggered.connect(lambda: self.action_change_datasource(layer))
                 set_icon(act_datasource, "Change_Data_Source.svg")
-                
+
                 act_open_folder = menu.addAction(tr("打开文件位置"))
                 act_open_folder.triggered.connect(lambda: self.action_open_containing_folder(layer))
                 set_icon(act_open_folder, "Open_File_Location.svg")
-                
+
                 menu.addSeparator()
-                
+
                 act_move = menu.addAction(tr("移动选中的 1 个文件到…"))
                 act_move.triggered.connect(lambda: self.action_move_files([layer]))
                 act_move.setToolTip(tr("从新路径加载文件"))
                 set_icon(act_move, "Move_File.svg")
-                
+
                 act_copy = menu.addAction(tr("复制选中的 1 个文件到…"))
                 act_copy.triggered.connect(lambda: self.action_copy_files([layer]))
                 act_copy.setToolTip(tr("从新路径加载文件"))
@@ -2504,31 +3273,31 @@ class SuperLayerDockWidget(QDialog):
                 act_backup.triggered.connect(lambda: self.action_backup_files([layer]))
                 act_backup.setToolTip(tr("从原始路径加载文件"))
                 set_icon(act_backup, "Backup_to_new_folder.svg")
-                
+
                 menu.addSeparator()
-                
+
                 edit_menu = menu.addMenu(tr("图层编辑"))
                 set_icon(edit_menu, "Layer_Editing.svg")
-                
+
                 if isinstance(layer, QgsVectorLayer):
                     pencil_label = tr("停止编辑") if layer.isEditable() else tr("开始编辑")
                     act_toggle_edit = edit_menu.addAction(pencil_label)
                     act_toggle_edit.triggered.connect(lambda: self.action_toggle_edit(layer))
                     set_icon(act_toggle_edit, "Start_Editing.svg")
-                
+
                 act_rename_layer = edit_menu.addAction(tr("重命名图层"))
                 act_rename_layer.triggered.connect(lambda: self.action_rename_layer(layer))
                 set_icon(act_rename_layer, "Rename_Layer.svg")
-                
+
                 act_rename_file = edit_menu.addAction(tr("重命名文件"))
                 act_rename_file.triggered.connect(lambda: self.action_rename_file(layer))
                 set_icon(act_rename_file, "Renamed_the_original_file.svg")
-                
+
                 if isinstance(layer, QgsVectorLayer):
                     act_open_attrs = edit_menu.addAction(tr("打开属性表"))
                     act_open_attrs.triggered.connect(lambda: self.action_open_attribute_table(layer))
                     set_icon(act_open_attrs, "Open_Property_Table.svg")
-                
+
                 act_properties = edit_menu.addAction(tr("打开图层属性"))
                 act_properties.triggered.connect(lambda: self.action_open_properties(layer))
                 set_icon(act_properties, "Open_Layer_Properties.svg")
@@ -2561,20 +3330,20 @@ class SuperLayerDockWidget(QDialog):
                     act_delete_files = menu.addAction(tr("删除文件"))
                     act_delete_files.triggered.connect(lambda: self.action_delete_files(layer))
                     set_icon(act_delete_files, "Delete_Files.svg")
-        
+
         else:
             # Multi-select actions
             try:
                 from .layer_model import is_layer_visible
             except ImportError:
                 from layer_model import is_layer_visible
-                
+
             first_visible = is_layer_visible(layers[0])
             if first_visible:
                 act_hide_multi = menu.addAction(tr("隐藏选中的 {} 个图层").format(len(layers)))
                 act_hide_multi.triggered.connect(lambda: self.action_set_layers_visibility(layers, False))
                 set_icon(act_hide_multi, "Component_layer_hide.svg")
-                
+
                 act_show_multi = menu.addAction(tr("显示选中的 {} 个图层").format(len(layers)))
                 act_show_multi.triggered.connect(lambda: self.action_set_layers_visibility(layers, True))
                 set_icon(act_show_multi, "Component_layer_show.svg")
@@ -2582,26 +3351,26 @@ class SuperLayerDockWidget(QDialog):
                 act_show_multi = menu.addAction(tr("显示选中的 {} 个图层").format(len(layers)))
                 act_show_multi.triggered.connect(lambda: self.action_set_layers_visibility(layers, True))
                 set_icon(act_show_multi, "Component_layer_show.svg")
-                
+
                 act_hide_multi = menu.addAction(tr("隐藏选中的 {} 个图层").format(len(layers)))
                 act_hide_multi.triggered.connect(lambda: self.action_set_layers_visibility(layers, False))
                 set_icon(act_hide_multi, "Component_layer_hide.svg")
-            
+
             menu.addSeparator()
-            
-            is_all_memory = all(hasattr(l, 'dataProvider') and l.dataProvider() and hasattr(l.dataProvider(), 'name') and l.dataProvider().name() == "memory" for l in layers)
-            
+
+            is_all_memory = all(hasattr(layer, 'dataProvider') and layer.dataProvider() and hasattr(layer.dataProvider(), 'name') and layer.dataProvider().name() == "memory" for layer in layers)
+
             if is_all_memory:
                 act_zoom = menu.addAction(tr("缩放到…"))
                 act_zoom.triggered.connect(lambda: self.action_zoom_to_layers(layers))
                 set_icon(act_zoom, "Zoom_to_Layer.svg")
-                
+
                 act_export_temp = menu.addAction(tr("保存临时图层到…"))
                 act_export_temp.triggered.connect(lambda: self.action_export_temporary_layers(layers))
                 set_icon(act_export_temp, "Save_Temporary_Layer.svg")
-                
+
                 menu.addSeparator()
-                
+
                 act_remove_layers = menu.addAction(tr("删除选中图层"))
                 act_remove_layers.triggered.connect(lambda: self.action_remove_layers(layers))
                 set_icon(act_remove_layers, "Delete_Layer.svg")
@@ -2609,14 +3378,14 @@ class SuperLayerDockWidget(QDialog):
                 act_zoom = menu.addAction(tr("缩放到选中的 {} 个图层").format(len(layers)))
                 act_zoom.triggered.connect(lambda: self.action_zoom_to_layers(layers))
                 set_icon(act_zoom, "Zoom_to_Layer.svg")
-                
+
                 menu.addSeparator()
-                
+
                 act_move = menu.addAction(tr("移动选中的 {} 个文件到…").format(len(layers)))
                 act_move.triggered.connect(lambda: self.action_move_files(layers))
                 act_move.setToolTip(tr("从新路径加载文件"))
                 set_icon(act_move, "Move_File.svg")
-                
+
                 act_copy = menu.addAction(tr("复制选中的 {} 个文件到…").format(len(layers)))
                 act_copy.triggered.connect(lambda: self.action_copy_files(layers))
                 act_copy.setToolTip(tr("从新路径加载文件"))
@@ -2626,16 +3395,16 @@ class SuperLayerDockWidget(QDialog):
                 act_backup.triggered.connect(lambda: self.action_backup_files(layers))
                 act_backup.setToolTip(tr("从原始路径加载文件"))
                 set_icon(act_backup, "Backup_to_new_folder.svg")
-                
+
                 menu.addSeparator()
-                
+
                 act_remove_layers = menu.addAction(tr("删除选中的 {} 个图层").format(len(layers)))
                 act_remove_layers.triggered.connect(lambda: self.action_remove_layers(layers))
                 set_icon(act_remove_layers, "Delete_Layer.svg")
-                
+
                 menu.addSeparator()
-                
-                is_all_gpkg = all(get_layer_format(l) == "gpkg" for l in layers)
+
+                is_all_gpkg = all(get_layer_format(layer) == "gpkg" for layer in layers)
                 if is_all_gpkg:
                     act_delete_gpkg_layers = menu.addAction(tr("删除选中的 {} 个数据库内图层").format(len(layers)))
                     act_delete_gpkg_layers.triggered.connect(lambda: self.action_delete_gpkg_layers(layers))
@@ -2667,14 +3436,14 @@ class SuperLayerDockWidget(QDialog):
             try:
                 norm_path = os.path.normpath(actual_path)
                 if os.name == 'nt':
-                    import subprocess  # noqa: PLC0415
+                    import subprocess  # noqa: PLC0415  # nosec B404
                     explorer_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'explorer.exe')
                     subprocess.Popen([explorer_path, '/select,', norm_path])  # nosec B603 B607
                 else:
                     dir_path = os.path.dirname(norm_path)
                     if os.path.isdir(dir_path):
                         import shutil  # noqa: PLC0415
-                        import subprocess  # noqa: PLC0415
+                        import subprocess  # noqa: PLC0415  # nosec B404
                         opener_cmd = 'open' if sys.platform == 'darwin' else 'xdg-open'
                         opener = shutil.which(opener_cmd) or ('/usr/bin/open' if sys.platform == 'darwin' else '/usr/bin/xdg-open')
                         subprocess.Popen([opener, dir_path])  # nosec B603 B607
@@ -2699,7 +3468,7 @@ class SuperLayerDockWidget(QDialog):
                     # Load new layer in QGIS
                     new_path = os.path.join(target_dir, os.path.basename(layer.source()))
                     new_layer = None
-                    
+
                     # Use dynamic checking of layer type
                     if isinstance(layer, QgsVectorLayer):
                         new_layer = QgsVectorLayer(new_path, tr("{} (复制)").format(layer.name()), layer.dataProvider().name())
@@ -2717,13 +3486,13 @@ class SuperLayerDockWidget(QDialog):
                             new_layer = QgsRasterLayer(new_path, tr("{} (复制)").format(layer.name()), "gdal")
 
                     if new_layer and new_layer.isValid():
+                        layer_style = self._capture_layer_style(layer)
+                        self._apply_layer_style(layer_style, new_layer)
+                        if isinstance(new_layer, QgsVectorLayer) and hasattr(layer, "subsetString"):
+                            # Provider subset filters are datasource state, not part of
+                            # QgsMapLayerStyle, so copy them explicitly.
+                            new_layer.setSubsetString(layer.subsetString())
                         QgsProject.instance().addMapLayer(new_layer)
-                        # Apply original symbology
-                        if hasattr(layer, 'renderer') and layer.renderer() and hasattr(new_layer, 'setRenderer'):
-                            new_layer.setRenderer(layer.renderer().clone())
-                        if hasattr(layer, 'labeling') and layer.labeling() and hasattr(new_layer, 'setLabeling'):
-                            new_layer.setLabeling(layer.labeling().clone())
-                        new_layer.triggerRepaint()
                 self.refresh()
             except Exception as e:
                 QMessageBox.warning(self, tr("操作失败"), tr("复制并应用样式失败: {}").format(str(e)))
@@ -2747,17 +3516,17 @@ class SuperLayerDockWidget(QDialog):
         if not source_path:
             QMessageBox.warning(self, tr("操作失败"), tr("该图层没有有效的数据源路径。"))
             return
-        
+
         # 1. Resolve physical path
         phys_path, _ = split_qgis_source(source_path)
         actual_path = resolve_physical_path(phys_path)
         if not actual_path:
             QMessageBox.warning(self, tr("操作失败"), tr("该图层没有有效的数据源物理路径。"))
             return
-            
+
         base_path, _ = os.path.splitext(actual_path)
         qml_path = base_path + ".qml"
-        
+
         deleted_file = False
         if os.path.exists(qml_path):
             try:
@@ -2766,7 +3535,7 @@ class SuperLayerDockWidget(QDialog):
             except Exception as e:
                 QMessageBox.warning(self, tr("操作失败"), tr("清除默认样式文件失败: {}").format(str(e)))
                 return
-        
+
         # 2. Reset style manager & renderer in memory
         try:
             layer.styleManager().reset()
@@ -2778,7 +3547,7 @@ class SuperLayerDockWidget(QDialog):
         except Exception as e:  # noqa: BLE001
             import logging
             logging.getLogger(__name__).warning("Failed to reset styleManager: %s", e)
-            
+
         if deleted_file:
             QMessageBox.information(self, tr("操作成功"), tr("默认样式文件已成功清除并重置图层样式。"))
         else:
@@ -2792,7 +3561,7 @@ class SuperLayerDockWidget(QDialog):
                 msg, success = res
             else:
                 msg, success = "", True
-            
+
             if success:
                 QMessageBox.information(self, tr("保存成功"), tr("当前样式已成功保存为默认样式。"))
             else:
@@ -2816,15 +3585,26 @@ class SuperLayerDockWidget(QDialog):
     def action_rename_file(self, layer):
         old_filename = os.path.basename(layer.source())
         new_name, ok = QInputDialog.getText(
-            self, 
-            tr("重命名原始物理文件"), 
-            tr("请输入新的物理文件名 (包含后缀，重命名后图层将自动以新的文件名载入):"), 
+            self,
+            tr("重命名原始物理文件"),
+            tr("请输入新的物理文件名 (包含后缀，重命名后图层将自动以新的文件名载入):"),
             text=old_filename
         )
         if ok and new_name and new_name != old_filename:
             try:
+                old_files = {os.path.normcase(os.path.abspath(path)) for path in get_associated_files(layer.source())}
                 safe_rename(layer, new_name)
                 self.refresh()
+                pending = [
+                    path for path in pending_rename_cleanup_files()
+                    if os.path.normcase(os.path.abspath(path)) in old_files
+                ]
+                if pending and hasattr(self.iface, 'messageBar'):
+                    self.iface.messageBar().pushMessage(
+                        tr("SuperLayer"),
+                        tr("文件已重命名；{} 个被占用的旧文件将在后台安全清理。").format(len(pending)),
+                        duration=6,
+                    )
             except Exception as e:
                 QMessageBox.warning(self, tr("操作失败"), tr("重命名文件失败: {}").format(str(e)))
 
@@ -2834,9 +3614,9 @@ class SuperLayerDockWidget(QDialog):
             return
         old_parent_dir = os.path.basename(os.path.dirname(phys_path))
         new_name, ok = QInputDialog.getText(
-            self, 
-            tr("重命名父文件夹名"), 
-            tr("请输入新的父文件夹名称:"), 
+            self,
+            tr("重命名父文件夹名"),
+            tr("请输入新的父文件夹名称:"),
             text=old_parent_dir
         )
         if ok and new_name and new_name != old_parent_dir:
@@ -2933,7 +3713,7 @@ class SuperLayerDockWidget(QDialog):
         """删除多个图层对应的物理文件（含所有伴生文件），同时从工程中移除图层。需用户确认。"""
         if not layers:
             return
-            
+
         all_files_to_delete = []
         for layer in layers:
             source_path = layer.source()
@@ -2945,17 +3725,17 @@ class SuperLayerDockWidget(QDialog):
                     all_files_to_delete.extend(associated)
                 else:
                     all_files_to_delete.append(actual_path)
-                    
+
         # Remove duplicates
         all_files_to_delete = list(set(all_files_to_delete))
         if not all_files_to_delete:
             QMessageBox.warning(self, tr("操作失败"), tr("选中的图层没有有效的本地物理文件路径，无法删除。"))
             return
-            
+
         file_list = "\n".join(f"  • {os.path.basename(f)}" for f in all_files_to_delete[:15])
         if len(all_files_to_delete) > 15:
             file_list += f"\n  ...等共 {len(all_files_to_delete)} 个文件"
-            
+
         reply = QMessageBox.warning(
             self,
             tr("确认删除多个文件"),
@@ -2965,7 +3745,7 @@ class SuperLayerDockWidget(QDialog):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
-            
+
         errors = []
         import gc
         # Release provider locks by removing layers first
@@ -2976,10 +3756,10 @@ class SuperLayerDockWidget(QDialog):
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning("Failed to remove layer %s from project: %s", layer.id(), e)
-                
+
         # Force garbage collection to release Windows file locks
         gc.collect()
-        
+
         # Delete original files
         for f in all_files_to_delete:
             try:
@@ -2987,9 +3767,9 @@ class SuperLayerDockWidget(QDialog):
                     os.remove(f)
             except Exception as e:
                 errors.append(f"{os.path.basename(f)}: {e}")
-                
+
         self.refresh()
-        
+
         if errors:
             QMessageBox.warning(self, tr("部分文件删除失败"), tr("以下文件未能删除：\n") + "\n".join(errors))
 
@@ -2998,29 +3778,29 @@ class SuperLayerDockWidget(QDialog):
         if not isinstance(layer, QgsVectorLayer):
             QMessageBox.warning(self, tr("操作失败"), tr("该功能仅支持矢量临时图层。"))
             return
-            
+
         file_filter = "GeoPackage (*.gpkg);;ESRI Shapefile (*.shp)"
         default_name = layer.name()
         path, selected_filter = QFileDialog.getSaveFileName(self, tr("保存/导出临时图层"), default_name, file_filter)
         if not path:
             return
-            
+
         driver_name = "GPKG"
         if path.endswith(".shp"):
             driver_name = "ESRI Shapefile"
-            
+
         try:
             layer_style = self._capture_layer_style(layer)
             options = QgsVectorFileWriter.SaveVectorOptions()
             options.driverName = driver_name
             options.fileEncoding = "UTF-8"
-            
+
             # Use writeAsVectorFormatV3 for QGIS 3
             context = QgsProject.instance().transformContext()
             err, err_msg, new_path, new_layer_id = QgsVectorFileWriter.writeAsVectorFormatV3(
                 layer, path, context, options
             )
-            
+
             # Since mock writes return 0 as QgsVectorFileWriter.WriterError.NoError
             # We check if write was successful
             if err == 0:  # NoError
@@ -3252,7 +4032,7 @@ class SuperLayerDockWidget(QDialog):
         """从 GPKG 数据库中永久删除该图层（表），并从工程中移除该图层。"""
         source_path = layer.source()
         phys_path, query_params = split_qgis_source(source_path)
-        
+
         # Parse table name from query params, e.g. |layername=my_table
         table_name = ""
         if "layername=" in query_params:
@@ -3262,9 +4042,9 @@ class SuperLayerDockWidget(QDialog):
                     break
         if not table_name:
             table_name = layer.name()
-            
+
         db_name = os.path.basename(phys_path)
-        
+
         reply = QMessageBox.warning(
             self,
             tr("确认删除数据库内图层"),
@@ -3274,15 +4054,15 @@ class SuperLayerDockWidget(QDialog):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
-            
+
         try:
             # 1. Remove from QGIS project first to release locks
             QgsProject.instance().removeMapLayer(layer.id())
-            
+
             # 2. Force GC to make sure sqlite database connection is closed by this layer
             import gc
             gc.collect()
-            
+
             # 3. Use OGR provider metadata to delete the layer table cleanly
             try:
                 from qgis.core import QgsProviderRegistry
@@ -3294,7 +4074,7 @@ class SuperLayerDockWidget(QDialog):
                     def providerMetadata(self, name): return MockMetadata()
                 QgsProviderRegistry = MockRegistry()  # noqa: N806
                 metadata = QgsProviderRegistry.providerMetadata("ogr")
-                
+
             if metadata:
                 success = metadata.deleteLayer(source_path)
                 if success:
@@ -3305,17 +4085,17 @@ class SuperLayerDockWidget(QDialog):
                 QMessageBox.warning(self, tr("删除失败"), tr("未找到 OGR 数据源管理器，无法删除。"))
         except Exception as e:
             QMessageBox.warning(self, tr("操作失败"), tr("删除数据库内图层发生异常: {}").format(str(e)))
-            
+
         self.refresh()
 
     def action_delete_gpkg_layers(self, layers):
         """批量从 GPKG 数据库中永久删除多个图层（表），并从工程中移除它们。"""
         if not layers:
             return
-            
+
         gpkg_list = []
-        for l in layers:
-            source_path = l.source()
+        for layer in layers:
+            source_path = layer.source()
             phys_path, query_params = split_qgis_source(source_path)
             table_name = ""
             if "layername=" in query_params:
@@ -3324,14 +4104,14 @@ class SuperLayerDockWidget(QDialog):
                         table_name = part.split('=', 1)[1]
                         break
             if not table_name:
-                table_name = l.name()
-            gpkg_list.append((l, phys_path, table_name))
-            
+                table_name = layer.name()
+            gpkg_list.append((layer, phys_path, table_name))
+
         # Format list for prompt
         prompt_list = "\n".join(f"  • 数据库: {os.path.basename(p)}, 表名: {t}" for _, p, t in gpkg_list[:15])
         if len(gpkg_list) > 15:
             prompt_list += f"\n  ...等共 {len(gpkg_list)} 个图层表"
-            
+
         reply = QMessageBox.warning(
             self,
             tr("确认删除数据库内图层"),
@@ -3341,20 +4121,20 @@ class SuperLayerDockWidget(QDialog):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
-            
+
         import gc
         project = QgsProject.instance()
         # Remove from project first to release locks
-        for l, _, _ in gpkg_list:
+        for layer, _, _ in gpkg_list:
             try:
-                project.removeMapLayer(l.id())
+                project.removeMapLayer(layer.id())
             except Exception as e:
                 import logging
-                logging.getLogger(__name__).warning("Failed to remove layer %s: %s", l.id(), e)
-                
+                logging.getLogger(__name__).warning("Failed to remove layer %s: %s", layer.id(), e)
+
         # Force GC to release file lock handles
         gc.collect()
-        
+
         # Now use OGR deleteLayer
         errors = []
         try:
@@ -3367,18 +4147,18 @@ class SuperLayerDockWidget(QDialog):
                 def providerMetadata(self, name): return MockMetadata()
             QgsProviderRegistry = MockRegistry()  # noqa: N806
             metadata = QgsProviderRegistry.providerMetadata("ogr")
-            
-        for l, _, t in gpkg_list:
+
+        for layer, _, table_name in gpkg_list:
             if metadata:
                 try:
-                    success = metadata.deleteLayer(l.source())
+                    success = metadata.deleteLayer(layer.source())
                     if not success:
-                        errors.append(f"{t}: 删除失败")
+                        errors.append(f"{table_name}: 删除失败")
                 except Exception as e:
-                    errors.append(f"{t}: {e}")
+                    errors.append(f"{table_name}: {e}")
             else:
-                errors.append(f"{t}: 未找到 OGR 数据源管理器")
-                
+                errors.append(f"{table_name}: 未找到 OGR 数据源管理器")
+
         self.refresh()
         if errors:
             QMessageBox.warning(self, tr("部分图层删除失败"), tr("以下数据库内图层未能成功删除：\n") + "\n".join(errors))
@@ -3386,17 +4166,17 @@ class SuperLayerDockWidget(QDialog):
             QMessageBox.information(self, tr("删除成功"), tr("选中的 {} 个数据库内图层已成功删除。").format(len(gpkg_list)))
 
     def action_set_layers_visibility(self, layers, visible):
-        valid_layers = [l for l in layers if l and l.isValid()]
+        valid_layers = [layer for layer in layers if layer and layer.isValid()]
         if not valid_layers:
             return
         try:
             project = QgsProject.instance()
         except Exception:
             return
-            
+
         if not project or not project.layerTreeRoot():
             return
-            
+
         root = project.layerTreeRoot()
         for layer in valid_layers:
             node = root.findLayer(layer.id())
@@ -3412,7 +4192,7 @@ class SuperLayerDockWidget(QDialog):
         except ImportError:
             # Fallback mock for testing environment
             return
-            
+
         # For a single valid layer, directly use QGIS's native zoom
         if len(layers) == 1:
             layer = layers[0]
@@ -3425,21 +4205,21 @@ class SuperLayerDockWidget(QDialog):
         combined_extent = QgsRectangle()
         canvas = self.iface.mapCanvas()
         project_crs = QgsProject.instance().crs()
-        
+
         for layer in layers:
             if not layer or not layer.isValid():
                 continue
             layer_extent = layer.extent()
             if layer_extent.isEmpty():
                 continue
-                
+
             try:
                 transform = QgsCoordinateTransform(layer.crs(), project_crs, QgsProject.instance())
                 transformed_extent = transform.transformBoundingBox(layer_extent)
                 combined_extent.combineExtentWith(transformed_extent)
             except Exception:
                 combined_extent.combineExtentWith(layer_extent)
-                
+
         if not combined_extent.isEmpty():
             combined_extent.scale(1.05)
             canvas.setExtent(combined_extent)
@@ -3466,20 +4246,19 @@ class SuperLayerDockWidget(QDialog):
                         res.extend(collect_layers_under_item(child))
                 return res
             layers = collect_layers_under_item(folder_item)
-            
+
         if not layers and folder_path:
             actual_path = resolve_physical_path(folder_path)
             if actual_path:
                 try:
                     from qgis.core import QgsProject
-                    for l in QgsProject.instance().mapLayers().values():
-                        if l and l.source():
-                            p_path, _ = split_qgis_source(l.source())
-                            l_actual = resolve_physical_path(p_path)
-                            if l_actual and os.path.normcase(os.path.abspath(l_actual)).startswith(os.path.normcase(os.path.abspath(actual_path))):
-                                layers.append(l)
+                    for layer in QgsProject.instance().mapLayers().values():
+                        if layer and layer.source():
+                            p_path, _ = split_qgis_source(layer.source())
+                            layer_actual = resolve_physical_path(p_path)
+                            if layer_actual and os.path.normcase(os.path.abspath(layer_actual)).startswith(os.path.normcase(os.path.abspath(actual_path))):
+                                layers.append(layer)
                 except ImportError:
                     pass
-                            
-        self.action_zoom_to_layers(layers)
 
+        self.action_zoom_to_layers(layers)

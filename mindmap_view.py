@@ -350,7 +350,7 @@ def is_mindmap_node_effectively_visible(node):
             try:
                 from layer_model import is_layer_effectively_visible
             except ImportError:
-                def is_layer_effectively_visible(l): return True
+                def is_layer_effectively_visible(layer): return True
         return is_layer_effectively_visible(node.layer)
     if node.children:
         return any(is_mindmap_node_effectively_visible(child) for child in node.children)
@@ -599,7 +599,8 @@ class MindMapNodeItem(QGraphicsObject):
         # Elide text if too long for node
         font_metrics = painter.fontMetrics()
         available_width = self.node.width - text_start_x - 10
-        elided_name = font_metrics.elidedText(tr(self.node.name), Qt.TextElideMode.ElideRight, int(available_width))
+        # Layer and folder names are user/project data, not UI strings.
+        elided_name = font_metrics.elidedText(self.node.name, Qt.TextElideMode.ElideRight, int(available_width))
         
         # Vertically centered text
         text_rect = QRectF(text_start_x, 0.0, available_width, self.node.height)
@@ -886,7 +887,7 @@ class MindMapView(QGraphicsView):
         max_width_by_depth = {}
         def compute_widths(node, depth=0):
             # Dynamic node width to prevent text overflow (icon = 32px + 20px padding)
-            node.width = max(130.0, get_text_width(tr(node.name)) + 52.0)
+            node.width = max(130.0, get_text_width(node.name) + 52.0)
             max_width_by_depth[depth] = max(max_width_by_depth.get(depth, 0.0), node.width)
             if not node.collapsed:
                 for child in node.children:

@@ -519,6 +519,7 @@ class LayerBoardWidget(QWidget):
         self.styleWidget = None
         self.styleLayer = None
         self.filter_visible_only = False
+        self.filter_layer_ids = None
         
         self.init_ui()
         
@@ -938,7 +939,7 @@ class LayerBoardWidget(QWidget):
             try:
                 from layer_model import get_layer_format
             except ImportError:
-                def get_layer_format(l):
+                def get_layer_format(layer):
                     return "其他"
         for lid, layer in lr.mapLayers().items():
             if get_layer_format(layer) == "在线图层":
@@ -950,16 +951,21 @@ class LayerBoardWidget(QWidget):
                 
             # Filter visible layers only if option is active
             if getattr(self, 'filter_visible_only', False):
-                try:
-                    from .layer_model import is_layer_effectively_visible
-                except ImportError:
+                filter_layer_ids = getattr(self, 'filter_layer_ids', None)
+                if filter_layer_ids is not None:
+                    if layer.id() not in filter_layer_ids:
+                        continue
+                else:
                     try:
-                        from layer_model import is_layer_effectively_visible
+                        from .layer_model import is_layer_effectively_visible
                     except ImportError:
-                        def is_layer_effectively_visible(l):
-                            return True
-                if not is_layer_effectively_visible(layer):
-                    continue
+                        try:
+                            from layer_model import is_layer_effectively_visible
+                        except ImportError:
+                            def is_layer_effectively_visible(layer):
+                                return True
+                    if not is_layer_effectively_visible(layer):
+                        continue
                 
             self.layerBoardChangedData[layerType][lid] = {}
             lineData = []
@@ -1411,6 +1417,14 @@ class LayerBoardWidget(QWidget):
 
     def on_filter_visible_toggled(self, checked):
         self.filter_visible_only = checked
+        if not checked:
+            self.filter_layer_ids = None
+        self.refreshTables()
+
+    def set_visibility_filter(self, checked, layer_ids=None):
+        """Filter by live visibility or by an explicit map-theme layer set."""
+        self.filter_visible_only = bool(checked)
+        self.filter_layer_ids = set(layer_ids) if checked and layer_ids is not None else None
         self.refreshTables()
 
     def onTabChanged(self):

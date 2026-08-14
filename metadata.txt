@@ -2,18 +2,38 @@
 name=SuperLayer
 qgisMinimumVersion=3.0
 qgisMaximumVersion=4.99
-description=使用列表、文件夹树、思维导图、矩形树图或图层属性看板管理工程图层，支持右键菜单移动/复制/备份物理文件、样式管理、删除图层与删除文件等高级操作。/ Manage engineering layers using lists, folder trees, mind maps, rectangular tree diagrams, or layer property dashboards. Advanced operations include moving, copying, or backing up physical files via the right-click menu, style management, and deleting layers or files.
-version=2.4.0
+description=使用分组树、文件夹树、思维导图、矩形树图或图层属性看板管理工程图层，支持地图主题过滤、同组拖动排序，以及移动、复制、备份物理文件和完整图层样式。/ Manage project layers with group and folder trees, mind maps, treemaps, or a layer property board, with map-theme filtering, same-group drag ordering, physical file operations, and complete layer-style transfer.
+version=2.6.3
 author=OpenQGIS
 email=OpenQGIS@outlook.com
-about=使用思维导图或矩形树图查看 QGIS 图层，支持多选批量更新数据源/CRS/编码/可见比例尺；右键菜单提供移动、复制、备份物理文件（可选是否从新路径加载）；样式管理支持保存与清除默认样式；并可直接删除图层或永久删除物理文件（含确认保护）。/ View QGIS layers using mind maps or rectangular tree diagrams, supporting batch updates for multiple data sources/CRS/notations/visible scales; the right-click menu provides options to move, copy, or back up physical files (with optional re-loading from new paths); Style management allows saving or clearing default styles; and you can directly delete layers or permanently delete physical files (with protection confirmation).
+about=通过分组树、文件夹树、思维导图、矩形树图和属性看板查看与管理 QGIS 图层。支持按当前画布或 QGIS 地图主题过滤图层、同组原生拖放排序、重复数据源大小去重、多选批量修改，以及移动、复制、备份物理文件并保留完整图层配置。/ View and manage QGIS layers through group and folder trees, mind maps, treemaps, and a property board. Filter by live canvas visibility or QGIS map themes, reorder layers within a group, avoid duplicate treemap sizes for shared data sources, batch-edit layer properties, and move, copy, or back up physical files while preserving complete layer configuration.
 tracker=https://github.com/OpenQGIS/SuperLayer/issues
 repository=https://github.com/OpenQGIS/SuperLayer
-tags=layers, properties, table, metadata, report, board, style, mindmap
+tags=layers, properties, map themes, treemap, metadata, board, style, mindmap, file management
 homepage=https://github.com/OpenQGIS/SuperLayer
 category=Plugins
 icon=icons/SuperLayer.png
 changelog=
+    Version 2.6.3:
+    - 🛠️ 清除 Flake8 E741 代码质量警告。 / clearing Flake8 E741 quality warnings.
+
+    Version 2.6.2:
+    - 🐛 修复 Windows 下重命名 Shapefile 后旧 .shp 与 .dbf 文件因数据源锁未及时释放而残留的问题。 / Fixed old .shp and .dbf files remaining after Shapefile renaming on Windows when data-source locks were released late.
+
+    Version 2.6.1:
+    - 🐛 复制或迁移矢量图层时同步原图层的过滤表达式。 / Copying or migrating vector layers now preserves filter expressions.
+
+    Version 2.6.0:
+    - ✨ 过滤按钮右键支持根据 QGIS 地图主题筛选。/ The Filter button's right-click context menu supports filtering based on the QGIS map theme.
+    - 🐛 矩形树图对共享同一物理数据源的图层仅计算一次文件大小。/ The rectangular tree map calculates the file size only once for layers that share the same physical data source.
+    - 🐛 复制或迁移图层时使用完整 QGIS 图层样式。/ Use the full QGIS layer style when copying or migrating layers.
+
+    Version 2.5.0:
+    - ✨ 分组面板支持在同一分组内拖动图层调整上下顺序。/ The grouping panel allows you to drag layers within the same group to adjust their order from top to bottom.
+    - 🐛 分组排序改用 QGIS 原生图层树模型。/ Switch group-by sorting to use QGIS's native Layer Tree model.
+    - 🎨 图层可见性勾选图标与行选择状态分离。/ Kept visibility checkbox styling independent from row selection for consistent state feedback.
+    - 🌐 补齐 12 个语言目录中的新增界面词条。/ Completed new UI catalog entries across 12 locales.
+
     Version 2.4.0:
     - ✨ 新增临时矢量图层统一批量保存窗口，支持将多个图层保存到同一 GeoPackage、KML、FileGDB 或 Shapefile 文件夹。/ Added a unified batch export dialog for saving temporary vector layers to one GeoPackage, KML, FileGDB, or Shapefile folder.
     - 🚀 优化批量保存流程，支持格式联动路径、名称冲突处理、逐层写入验证及统一结果汇总。/ Improved batch saving with format-aware destinations, name conflict handling, per-layer validation, and a consolidated result summary.
