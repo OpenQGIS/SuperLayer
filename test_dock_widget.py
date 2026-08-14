@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 import os
+import sys
 import tempfile
 import shutil
 
@@ -801,7 +802,12 @@ class TestDockWidget(unittest.TestCase):
                 with patch('os.path.isdir', return_value=True):
                     dock._create_folder_context_menu("/some/physical/dir", MagicMock())
                     explorer_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'explorer.exe')
-                    mock_popen.assert_called_with([explorer_path, '\\some\\physical\\dir'])
+                    expected_dir = (
+                        '\\some\\physical\\dir'
+                        if sys.platform == 'win32'
+                        else '/some/physical/dir'
+                    )
+                    mock_popen.assert_called_with([explorer_path, expected_dir])
 
     def test_switch_view_layer_board(self):
         with patch('dock_widget.LayerTreeModel'), \
