@@ -1,5 +1,16 @@
 # SuperLayer - QGIS 核心图层与物理文件管理器
 
+<p align="left">
+  <img src="https://img.shields.io/badge/status-feature--complete-brightgreen?style=flat&logo=checkmarx&logoColor=white" alt="Status">
+  <a href="https://plugins.qgis.org/plugins/SuperLayer/"><img src="https://img.shields.io/qgis/plugin/v/SuperLayer?style=flat&label=qgis%20plugin&logo=qgis&logoColor=white&color=589632" alt="QGIS Plugin"></a>
+  <a href="https://plugins.qgis.org/plugins/SuperLayer/"><img src="https://img.shields.io/qgis/plugin/dt/SuperLayer?style=flat&label=downloads&color=blue" alt="Downloads"></a>
+  <a href="https://github.com/OpenQGIS/SuperLayer/releases"><img src="https://img.shields.io/github/v/release/OpenQGIS/SuperLayer?style=flat&color=007ec6&label=release" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/OpenQGIS/SuperLayer?style=flat&color=blue" alt="License"></a>
+</p>
+
+> 💡 **项目状态说明 (Project Status)**：  
+> 本插件图层批量操作、属性增强与管理工具集已达到**功能闭环与生产就绪状态（Feature-Complete / Production-Ready）**。本工具主打轻量、高效，后续将保持当前纯粹体验，重心转向长期稳定性与新版 QGIS 兼容性维护。
+
 `SuperLayer` 是一个用于 QGIS 的多维图层与文件管理器插件，通过列表、物理树、矩形树图、思维导图和属性属性看板五个维度，帮助您直观地组织工程图层，并安全地在磁盘层面操作物理数据文件。
 
 ---
