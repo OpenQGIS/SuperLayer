@@ -301,7 +301,7 @@ def safe_move(layer, target_dir):
     actual_path = resolve_physical_path(phys_source_path)
     if not actual_path or not os.path.exists(actual_path):
         return False
-    
+
     # Early exit if moving to same directory
     source_dir = os.path.dirname(phys_source_path)
     if os.path.normcase(os.path.abspath(source_dir)) == os.path.normcase(os.path.abspath(target_dir)):
@@ -309,32 +309,53 @@ def safe_move(layer, target_dir):
 
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
-    
+
     files = get_associated_files(phys_source_path)
     moved_files = []
-    
-    # Copy files first
-    for src in files:
-        dest = os.path.join(target_dir, os.path.basename(src))
-        shutil.copy2(src, dest)
-        moved_files.append((src, dest))
-        
-    # Verify copied files exist
-    for _, dest in moved_files:
-        if not os.path.exists(dest):
-            return False
-            
-    # Update layer source path in QGIS
+
+    # Copy phase: originals are never touched while copying, so any
+    # interruption (disk full, memory error, crash) leaves them intact.
+    try:
+        for src in files:
+            dest = os.path.join(target_dir, os.path.basename(src))
+            shutil.copy2(src, dest)
+            moved_files.append((src, dest))
+    except BaseException:
+        # Remove only the copies created by this call so a retry is not
+        # blocked by conflict checks on truncated leftovers.
+        for _, dest in moved_files:
+            try:
+                os.remove(dest)
+            except OSError:
+                logging.getLogger(__name__).warning("Failed to remove partial copy %s", dest)
+        raise
+
+    # Verify phase: fingerprint every copy BEFORE the layer or the originals
+    # are modified; a truncated or corrupted copy aborts the whole move.
+    for src, dest in moved_files:
+        try:
+            copy_ok = os.path.exists(dest) and _file_fingerprint(src) == _file_fingerprint(dest)
+        except OSError:
+            copy_ok = False
+        if not copy_ok:
+            for _, bad_dest in moved_files:
+                try:
+                    os.remove(bad_dest)
+                except OSError:
+                    logging.getLogger(__name__).warning("Failed to remove unverified copy %s", bad_dest)
+            raise IOError("Copied file verification failed during move; original files kept: %s" % dest)
+
+    # Swap phase: point the layer at the verified copies.
     new_phys_source_path = os.path.join(target_dir, os.path.basename(phys_source_path))
     new_source_path = new_phys_source_path + query_params
     update_layer_source(layer, new_source_path)
-    
-    # Delete original files after successful swap
+
+    # Delete phase: originals are removed only after the layer resolves to
+    # verified copies, so the data always exists in at least one place.
     for src, _ in moved_files:
         try:
             os.remove(src)
         except Exception as e:  # noqa: BLE001
-            import logging
             logging.getLogger(__name__).error("Failed to remove source file %s: %s", src, e)
     return True
 
@@ -445,9 +466,74 @@ def safe_rename(layer, new_filename):
         
     return True
 
+def _restore_layer_sources(updated_layers):
+    """Restore sources already swapped during a failed directory migration.
+
+    Returns True only when every layer could be pointed back at its original
+    path, telling the caller whether the copied tree is now safe to delete.
+    """
+    all_restored = True
+    for layer, old_source in updated_layers:
+        try:
+            update_layer_source(layer, old_source)
+        except Exception as exc:  # noqa: BLE001
+            all_restored = False
+            logging.getLogger(__name__).error(
+                "Failed to restore layer source '%s' during rollback: %s", old_source, exc
+            )
+    return all_restored
+
+
+def _best_effort_remove_tree(path):
+    try:
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        elif os.path.exists(path):
+            os.remove(path)
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger(__name__).warning("Failed to remove copied path %s: %s", path, exc)
+
+
+def _stat_map(root_dir):
+    stats = {}
+    for root, _dirs, names in os.walk(root_dir):
+        for name in names:
+            full = os.path.join(root, name)
+            rel = os.path.relpath(full, root_dir).replace('\\', '/')
+            stats[rel] = os.path.getsize(full)
+    return stats
+
+
+def _verify_copied_tree(source_dir, dest_dir):
+    """Compare file count and per-file sizes of a copied directory tree.
+
+    Runs after the copy but BEFORE any layer source or original file is
+    modified, so a size mismatch aborts the migration with the originals
+    still untouched.
+    """
+    src_stats = _stat_map(source_dir)
+    dst_stats = _stat_map(dest_dir)
+    if len(dst_stats) != len(src_stats):
+        raise IOError(
+            "Copy verification failed: expected %d files, found %d" % (len(src_stats), len(dst_stats))
+        )
+    for rel, size in src_stats.items():
+        if dst_stats.get(rel) != size:
+            raise IOError(
+                "Copy verification failed for %s: expected %s bytes, found %s"
+                % (rel, size, dst_stats.get(rel))
+            )
+
+
 def safe_rename_dir(source_dir, new_dir_name, additional_layers=None):
     if not source_dir or not os.path.exists(source_dir):
         return False
+    # Treat the input as a single directory name: reject anything that
+    # could escape the parent directory (separators, "..", absolute paths).
+    raw_name = str(new_dir_name).strip()
+    if not raw_name or raw_name in ('.', '..') or '/' in raw_name or '\\' in raw_name:
+        raise ValueError("Invalid folder name: " + str(new_dir_name))
+    new_dir_name = raw_name
     source_dir = os.path.abspath(source_dir).replace('\\', '/')
     
     parent_dir_parent = os.path.dirname(source_dir)
@@ -489,15 +575,21 @@ def safe_rename_dir(source_dir, new_dir_name, additional_layers=None):
                 layers_to_update.append((layer, p_path, q_params))
                 seen_layers.add(layer)
                 
-    # Copy directory contents recursively to avoid Windows file locks on move
-    shutil.copytree(source_dir, new_source_dir)
-    
+    # Copy directory contents recursively to avoid Windows file locks on move.
+    # Everything runs inside one try/except so a partial copy is cleaned up.
+    updated_layers = []
     try:
+        shutil.copytree(source_dir, new_source_dir)
+        # Verify the copy before the first layer source is modified.
+        _verify_copied_tree(source_dir, new_source_dir)
+
         # Update QGIS layer sources to point to new directory
         for layer, p_path, q_params in layers_to_update:
             filename = os.path.basename(p_path)
+            old_l_path = p_path.replace('\\', '/') + q_params
             new_l_path = os.path.join(new_source_dir, filename).replace('\\', '/') + q_params
             update_layer_source(layer, new_l_path)
+            updated_layers.append((layer, old_l_path))
             
         # Process pending Qt events to force destruction of old providers
         try:
@@ -536,15 +628,18 @@ def safe_rename_dir(source_dir, new_dir_name, additional_layers=None):
             logging.getLogger(__name__).warning("Failed to remove old parent directory %s after multiple attempts due to locks", source_dir)
             
     except Exception as e:
-        # Rollback copied new directory if anything failed before we updated all layers
-        try:
-            if os.path.exists(new_source_dir):
-                shutil.rmtree(new_source_dir)
-        except Exception as rollback_err:
-            import logging
-            logging.getLogger(__name__).error("Failed to rollback copied destination directory %s: %s", new_source_dir, rollback_err)
+        # Rollback order matters: layers already pointing into the copy must
+        # be restored FIRST. Deleting the copy while a layer references it
+        # would break the project even though the original data is intact.
+        if _restore_layer_sources(updated_layers):
+            _best_effort_remove_tree(new_source_dir)
+        else:
+            logging.getLogger(__name__).error(
+                "Kept copied directory %s because some layer sources could not be restored",
+                new_source_dir,
+            )
         raise e
-        
+
     return True
 
 def safe_rename_parent_dir(layer, new_dir_name):
@@ -612,27 +707,34 @@ def safe_migrate_dir(source_path, target_parent_dir, additional_layers=None):
                 layers_to_update.append((layer, p_path, q_params))
                 seen_layers.add(layer)
                 
-    # Copy the directory or file
-    if os.path.isdir(source_path):
-        shutil.copytree(source_path, new_path)
-    else:
-        # It's a file (like GPKG). Make sure the parent dir exists.
-        parent_dir = os.path.dirname(new_path)
-        if not os.path.exists(parent_dir):
-            os.makedirs(parent_dir)
-        shutil.copy2(source_path, new_path)
-        # Copy GPKG sidecar WAL/SHM if they exist
-        for log_ext in ['-wal', '-shm']:
-            log_src = source_path + log_ext
-            log_dest = new_path + log_ext
-            if os.path.exists(log_src):
-                try:
-                    shutil.copy2(log_src, log_dest)
-                except Exception as e:
-                    import logging
-                    logging.getLogger(__name__).debug("Failed to copy sidecar file %s: %s", log_src, e)
-        
+    # Copy the directory or file, verify it, then swap sources. Everything
+    # runs inside one try/except so partial copies are cleaned up and layers
+    # are restored before the copy is removed.
+    updated_layers = []
     try:
+        if os.path.isdir(source_path):
+            shutil.copytree(source_path, new_path)
+            # Verify the copy before the first layer source is modified.
+            _verify_copied_tree(source_path, new_path)
+        else:
+            # It's a file (like GPKG). Make sure the parent dir exists.
+            parent_dir = os.path.dirname(new_path)
+            if not os.path.exists(parent_dir):
+                os.makedirs(parent_dir)
+            shutil.copy2(source_path, new_path)
+            # Copy GPKG sidecar WAL/SHM if they exist
+            for log_ext in ['-wal', '-shm']:
+                log_src = source_path + log_ext
+                log_dest = new_path + log_ext
+                if os.path.exists(log_src):
+                    try:
+                        shutil.copy2(log_src, log_dest)
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).debug("Failed to copy sidecar file %s: %s", log_src, e)
+            if _file_fingerprint(source_path) != _file_fingerprint(new_path):
+                raise IOError("Copied file verification failed: %s" % new_path)
+
         # Update QGIS layer sources
         for layer, p_path, q_params in layers_to_update:
             if os.path.isdir(source_path):
@@ -640,7 +742,9 @@ def safe_migrate_dir(source_path, target_parent_dir, additional_layers=None):
                 new_l_path = os.path.normpath(os.path.join(new_path, rel_path)).replace('\\', '/') + q_params
             else:
                 new_l_path = new_path + q_params
+            old_l_path = p_path.replace('\\', '/') + q_params
             update_layer_source(layer, new_l_path)
+            updated_layers.append((layer, old_l_path))
             
         # Process pending Qt events to force destruction of old providers
         try:
@@ -690,24 +794,25 @@ def safe_migrate_dir(source_path, target_parent_dir, additional_layers=None):
             logging.getLogger(__name__).warning("Failed to remove old path %s after multiple attempts due to locks", source_path)
             
     except Exception as e:
-        # Rollback
-        try:
-            if os.path.exists(new_path):
-                if os.path.isdir(new_path):
-                    shutil.rmtree(new_path)
-                else:
-                    os.remove(new_path)
-                    for log_ext in ['-wal', '-shm']:
-                        log_dest = new_path + log_ext
-                        if os.path.exists(log_dest):
-                            try:
-                                os.remove(log_dest)
-                            except Exception as e:
-                                import logging
-                                logging.getLogger(__name__).debug("Failed to remove sidecar file %s during rollback: %s", log_dest, e)
-        except Exception as rollback_err:
-            import logging
-            logging.getLogger(__name__).error("Failed to rollback copied path %s: %s", new_path, rollback_err)
+        # Rollback order matters: layers already pointing into the copy must
+        # be restored FIRST. Deleting the copy while a layer references it
+        # would break the project even though the original data is intact.
+        if _restore_layer_sources(updated_layers):
+            _best_effort_remove_tree(new_path)
+            if not os.path.isdir(new_path):
+                for log_ext in ['-wal', '-shm']:
+                    log_dest = new_path + log_ext
+                    if os.path.exists(log_dest):
+                        try:
+                            os.remove(log_dest)
+                        except Exception as exc:  # noqa: BLE001
+                            logging.getLogger(__name__).debug(
+                                "Failed to remove sidecar file %s during rollback: %s", log_dest, exc
+                            )
+        else:
+            logging.getLogger(__name__).error(
+                "Kept copied path %s because some layer sources could not be restored", new_path
+            )
         raise e
         
     return True

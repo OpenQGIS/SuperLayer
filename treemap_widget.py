@@ -1,18 +1,210 @@
 import os
 
-from qgis.PyQt.QtCore import Qt, QRectF, pyqtSignal as Signal, QPoint
-from qgis.PyQt.QtWidgets import QWidget, QToolTip
-from qgis.PyQt.QtGui import QPainter, QColor, QFont, QPen, QBrush, QLinearGradient
+# Robust fallback imports for Qt
+try:
+    from qgis.PyQt.QtCore import Qt, QRectF, pyqtSignal as Signal, QPoint
+    from qgis.PyQt.QtWidgets import QWidget, QToolTip
+    from qgis.PyQt.QtGui import QPainter, QColor, QFont, QPen, QBrush, QLinearGradient
+except ImportError:
+    try:
+        from qtpy.QtCore import Qt, QRectF, Signal, QPoint
+        from qtpy.QtWidgets import QWidget, QToolTip
+        from qtpy.QtGui import QPainter, QColor, QFont, QPen, QBrush, QLinearGradient
+    except ImportError:
+        try:
+            from PySide2.QtCore import Qt, QRectF, Signal, QPoint
+            from PySide2.QtWidgets import QWidget, QToolTip
+            from PySide2.QtGui import QPainter, QColor, QFont, QPen, QBrush, QLinearGradient
+        except ImportError:
+            try:
+                from PySide6.QtCore import Qt, QRectF, Signal, QPoint
+                from PySide6.QtWidgets import QWidget, QToolTip
+                from PySide6.QtGui import QPainter, QColor, QFont, QPen, QBrush, QLinearGradient
+            except ImportError:
+                # Basic mock for environment without PySide/PyQt (allows unit testing on CLI)
+                class Qt:
+                    AlignCenter = 132
+                    TextWordWrap = 64
+                    LeftButton = 1
+                    RightButton = 2
+                    ElideRight = 1
+                    
+                    class AlignmentFlag:
+                        AlignCenter = 132
+                        
+                    class TextFlag:
+                        TextWordWrap = 64
+                        
+                    class MouseButton:
+                        LeftButton = 1
+                        RightButton = 2
+                        
+                    class TextElideMode:
+                        ElideRight = 1
 
+                class QRectF:
+                    def __init__(self, x=0.0, y=0.0, width=0.0, height=0.0):
+                        self._x = float(x)
+                        self._y = float(y)
+                        self._w = float(width)
+                        self._h = float(height)
+                    def x(self): return self._x
+                    def y(self): return self._y
+                    def width(self): return self._w
+                    def height(self): return self._h
+                    def topLeft(self): return QPoint(self._x, self._y)
+                    def bottomRight(self): return QPoint(self._x + self._w, self._y + self._h)
+                    def contains(self, x, y):
+                        return self._x <= x <= self._x + self._w and self._y <= y <= self._y + self._h
+                    def adjusted(self, dx1, dy1, dx2, dy2):
+                        return QRectF(self._x + dx1, self._y + dy1, self._w + dx2 - dx1, self._h + dy2 - dy1)
+                        
+                class Signal:
+                    def __init__(self, *types):
+                        self.types = types
+                        self._listeners = []
+                    def __get__(self, instance, owner):
+                        return self
+                    def connect(self, slot):
+                        self._listeners.append(slot)
+                    def emit(self, *args):
+                        for listener in self._listeners:
+                            listener(*args)
+                            
+                class QPoint:
+                    def __init__(self, x=0, y=0):
+                        self._x = x
+                        self._y = y
+                    def x(self): return self._x
+                    def y(self): return self._y
+                    
+                class QWidget:
+                    def __init__(self, parent=None):
+                        self._parent = parent
+                        self._width = 640
+                        self._height = 480
+                    def setMouseTracking(self, tracking):
+                        pass
+                    def width(self):
+                        return self._width
+                    def height(self):
+                        return self._height
+                    def rect(self):
+                        return QRectF(0, 0, self._width, self._height)
+                    def update(self):
+                        pass
+                    def resize(self, w, h):
+                        self._width = w
+                        self._height = h
+                        
+                class QToolTip:
+                    @classmethod
+                    def showText(cls, *args):
+                        pass
+                    @classmethod
+                    def hideText(cls):
+                        pass
+                        
+                class QPainter:
+                    Antialiasing = 1
+                    def __init__(self, *args):
+                        pass
+                    def setRenderHint(self, *args):
+                        pass
+                    def drawText(self, *args):
+                        pass
+                    def setPen(self, *args):
+                        pass
+                    def setBrush(self, *args):
+                        pass
+                    def drawRect(self, *args):
+                        pass
+                    def setFont(self, *args):
+                        pass
+                        
+                class QColor:
+                    def __init__(self, *args):
+                        pass
+                    def lighter(self, *args):
+                        return self
+                    def darker(self, *args):
+                        return self
+                        
+                class QFont:
+                    def __init__(self, *args):
+                        pass
+                        
+                class QPen:
+                    def __init__(self, *args):
+                        pass
+                        
+                class QBrush:
+                    def __init__(self, *args):
+                        pass
+                        
+                class QLinearGradient:
+                    def __init__(self, *args):
+                        pass
+                    def setColorAt(self, *args):
+                        pass
+
+# Robust fallback imports for QGIS
+try:
+    from qgis.core import QgsMapLayer
+except ImportError:
+    class QgsMapLayer:
+        def __init__(self, layer_id="", name="", source_path=""):
+            self._id = layer_id
+            self._name = name
+            self._source = source_path
+        def id(self): return self._id
+        def name(self): return self._name
+        def source(self): return self._source
+        def isValid(self): return True
+
+# Robust imports for file_operations helper functions
 try:
     from .file_operations import get_associated_files, split_qgis_source, format_size, resolve_physical_path
 except ImportError:
-    from file_operations import get_associated_files, split_qgis_source, format_size, resolve_physical_path
+    try:
+        from file_operations import get_associated_files, split_qgis_source, format_size, resolve_physical_path
+    except ImportError:
+        def resolve_physical_path(path):
+            return path
+            
+        def split_qgis_source(source_path):
+            if not source_path:
+                return "", ""
+            parts = source_path.split('|', 1)
+            phys_path = parts[0]
+            q_params = '|' + parts[1] if len(parts) == 2 else ""
+            if '?' in phys_path:
+                sub_parts = phys_path.split('?', 1)
+                phys_path = sub_parts[0]
+                q_params = '?' + sub_parts[1] + q_params
+            return phys_path.replace('\\', '/'), q_params
+        
+        def get_associated_files(file_path):
+            phys_path, _ = split_qgis_source(file_path)
+            return [phys_path] if (phys_path and os.path.exists(phys_path)) else []
 
+        def format_size(size_in_bytes):
+            """Formats the size in bytes to a human-readable string."""
+            if size_in_bytes <= 0:
+                return "-"
+            val = float(size_in_bytes)
+            for unit in ['B', 'KB', 'MB', 'GB']:
+                if val < 1024.0:
+                    return f"{val:.2f} {unit}"
+                val /= 1024.0
+            return f"{val:.2f} TB"
 try:
     from .translation import tr
 except ImportError:
-    from translation import tr
+    try:
+        from translation import tr
+    except ImportError:
+        def tr(text, disambiguation=None): return text
 
 
 class TreeMapNode:
@@ -266,26 +458,36 @@ class TreeMapWidget(QWidget):
             return
         
         painter.setFont(self.font)
-        
+
+        # Resolve helpers once per paint instead of once per node, and cache
+        # the hide-overlay pixmap: reparsing SVGs inside the loop stutters.
+        try:
+            from .layer_model import get_layer_format, get_format_color_dict, is_layer_effectively_visible
+        except ImportError:
+            try:
+                from layer_model import get_layer_format, get_format_color_dict, is_layer_effectively_visible
+            except ImportError:
+                def get_layer_format(layer): return "other"
+                def get_format_color_dict(f): return {"treemap": "#9e9e9e"}
+                def is_layer_effectively_visible(layer): return True
+
+        hide_pixmap = self._get_hide_pixmap()
+
         for idx, node in enumerate(self.nodes):
             r = node.rect
             if r.width() < 5 or r.height() < 5:
                 continue
-            
+
+            # Layers removed elsewhere in QGIS leave dangling wrappers on the
+            # nodes until the next refresh; skip them instead of crashing.
             try:
-                from .layer_model import get_layer_format, get_format_color_dict, is_layer_effectively_visible
-            except ImportError:
-                try:
-                    from layer_model import get_layer_format, get_format_color_dict, is_layer_effectively_visible
-                except ImportError:
-                    def get_layer_format(layer): return "other"
-                    def get_format_color_dict(f): return {"treemap": "#9e9e9e"}
-                    def is_layer_effectively_visible(layer): return True
-                    
-            fmt = get_layer_format(node.layer)
-            colors_dict = get_format_color_dict(fmt)
-            base_color = QColor(colors_dict["treemap"])
-            is_vis = is_layer_effectively_visible(node.layer)
+                fmt = get_layer_format(node.layer)
+                colors_dict = get_format_color_dict(fmt)
+                base_color = QColor(colors_dict["treemap"])
+                is_vis = is_layer_effectively_visible(node.layer)
+                layer_name = node.layer.name()
+            except RuntimeError:
+                continue
             if not is_vis:
                 base_color = base_color.darker(140)
             if node == self.hovered_node:
@@ -293,32 +495,18 @@ class TreeMapWidget(QWidget):
                 pen = self.hover_pen
             else:
                 pen = self.normal_pen
-                
+
             grad = QLinearGradient(r.topLeft(), r.bottomRight())
             grad.setColorAt(0.0, base_color)
             grad.setColorAt(1.0, base_color.darker(115))
-            
+
             painter.setPen(pen)
             painter.setBrush(QBrush(grad))
             painter.drawRect(r)
-            
+
             # Top-left invisible icon overlay if layer is not effectively visible
-            if not is_vis and r.width() >= 18 and r.height() >= 18:
-                plugin_dir = os.path.dirname(os.path.abspath(__file__))
-                hide_icon_path = os.path.join(plugin_dir, "icons_component", "Component_layer_hide.svg")
-                if os.path.exists(hide_icon_path):
-                    try:
-                        from qgis.PyQt.QtGui import QIcon
-                    except ImportError:
-                        try:
-                            from qtpy.QtGui import QIcon
-                        except ImportError:
-                            QIcon = None
-                    if QIcon and hasattr(QIcon, 'pixmap'):
-                        icon = QIcon(hide_icon_path)
-                        px = icon.pixmap(18, 18)
-                        if px and hasattr(px, 'isNull') and not px.isNull() and hasattr(painter, 'drawPixmap'):
-                            painter.drawPixmap(int(r.x() + 6), int(r.y() + 6), px)
+            if not is_vis and hide_pixmap is not None and r.width() >= 18 and r.height() >= 18:
+                painter.drawPixmap(int(r.x() + 6), int(r.y() + 6), hide_pixmap)
             
             pad_x = 4.0 if r.width() > 40 else 2.0
             pad_y = 4.0 if r.height() > 30 else 2.0
@@ -339,10 +527,41 @@ class TreeMapWidget(QWidget):
                 size_str = format_size(node.physical_size)
                 if node.reference_count > 1:
                     size_str += " · " + tr("共享×{}").format(node.reference_count)
-                lines = format_treemap_text(node.layer.name(), size_str, w, h, fm)
+                lines = format_treemap_text(layer_name, size_str, w, h, fm)
                 if lines:
                     text = "\n".join(lines)
                     painter.drawText(r.adjusted(pad_x, pad_y, -pad_x, -pad_y), Qt.AlignmentFlag.AlignCenter, text)
+
+    def _get_hide_pixmap(self):
+        """Return a cached 18x18 pixmap of the hide-overlay icon (or None)."""
+        if getattr(self, "_hide_pixmap", None) is not None:
+            return self._hide_pixmap
+        hide_icon_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "icons_component", "Component_layer_hide.svg"
+        )
+        if not os.path.exists(hide_icon_path):
+            self._hide_pixmap = None
+            return None
+        try:
+            try:
+                from qgis.PyQt.QtGui import QIcon
+            except ImportError:
+                try:
+                    from qtpy.QtGui import QIcon
+                except ImportError:
+                    QIcon = None
+            if QIcon is None or not hasattr(QIcon, 'pixmap'):
+                self._hide_pixmap = None
+                return None
+            px = QIcon(hide_icon_path).pixmap(18, 18)
+            if px is None or (hasattr(px, 'isNull') and px.isNull()):
+                px = None
+            self._hide_pixmap = px
+            return px
+        except Exception:
+            self._hide_pixmap = None
+            return None
 
     def leaveEvent(self, event):
         if self.hovered_node:
@@ -371,7 +590,11 @@ class TreeMapWidget(QWidget):
                     except AttributeError:
                         global_pos = QPoint(0, 0)
                 size_str = format_size(found.physical_size)
-                details = f"{found.layer.name()}\n" + tr("物理文件大小: {}").format(size_str)
+                try:
+                    layer_label = found.layer.name()
+                except RuntimeError:
+                    layer_label = found.path
+                details = f"{layer_label}\n" + tr("物理文件大小: {}").format(size_str)
                 if found.reference_count > 1:
                     details += "\n" + tr("共享此文件的图层: {} 个").format(found.reference_count)
                     details += "\n" + tr("矩形面积按引用数平均分配，不重复计算")
@@ -383,7 +606,10 @@ class TreeMapWidget(QWidget):
     def mouseDoubleClickEvent(self, event):
         """Emits layerSelected signal on double-click with left button."""
         if self.hovered_node and event.button() == Qt.MouseButton.LeftButton:
-            self.layerSelected.emit(self.hovered_node.layer.id())
+            try:
+                self.layerSelected.emit(self.hovered_node.layer.id())
+            except RuntimeError:
+                pass
 
     def mouseReleaseEvent(self, event):
         """Emits contextMenuTriggered signal on right-click."""

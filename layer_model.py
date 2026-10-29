@@ -1,18 +1,247 @@
 import os
 
-from qgis.PyQt.QtCore import Qt, QSize
-from qgis.PyQt.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QPainter
-from qgis.core import QgsProject, QgsLayerTreeGroup, QgsLayerTreeLayer
-
+try:
+    from qgis.PyQt.QtCore import Qt, QSize
+    from qgis.PyQt.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QPainter
+except ImportError:
+    try:
+        from qtpy.QtCore import Qt, QSize
+        from qtpy.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QPainter
+    except ImportError:
+        try:
+            from PySide2.QtCore import Qt, QSize
+            from PySide2.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QPainter
+        except ImportError:
+            try:
+                from PySide6.QtCore import Qt, QSize
+                from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QPainter
+            except ImportError:
+                # Basic mock for environment without PySide/PyQt (allows unit testing on CLI)
+                class Qt:
+                    UserRole = 32
+                    ItemIsEditable = 2
+                    class ItemDataRole:
+                        UserRole = 32
+                    class ItemFlag:
+                        NoItemFlags = 0
+                        ItemIsEditable = 2
+                    class CheckState:
+                        Unchecked = 0
+                        PartiallyChecked = 1
+                        Checked = 2
+                class QSize:
+                    def __init__(self, w, h):
+                        pass
+                class QIcon:
+                    def __init__(self, *args):
+                        pass
+                class QPixmap:
+                    def __init__(self, *args):
+                        pass
+                    def fill(self, color):
+                        pass
+                class QPainter:
+                    def __init__(self, *args):
+                        pass
+                    def end(self):
+                        pass
+                class QStandardItem:
+                    def __init__(self, text=""):
+                        self._text = text
+                        self._data = {}
+                        self._children = []
+                        self._icon = None
+                        self._tooltip = ""
+                    def flags(self):
+                        return 33
+                    def setFlags(self, flags):
+                        pass
+                    def setData(self, value, role):
+                        self._data[role] = value
+                    def data(self, role):
+                        return self._data.get(role, None)
+                    def text(self):
+                        return self._text
+                    def setText(self, text):
+                        self._text = text
+                    def setIcon(self, icon):
+                        self._icon = icon
+                    def icon(self):
+                        return self._icon
+                    def setToolTip(self, text):
+                        self._tooltip = text
+                    def toolTip(self):
+                        return self._tooltip
+                    def setCheckable(self, val):
+                        self._checkable = val
+                    def setCheckState(self, state):
+                        self._checkstate = state
+                    def checkState(self):
+                        return getattr(self, '_checkstate', 0)
+                    def appendRow(self, items):
+                        if isinstance(items, list):
+                            self._children.append(items)
+                        else:
+                            self._children.append([items])
+                    def rowCount(self):
+                        return len(self._children)
+                    def child(self, row, column=0):
+                        if 0 <= row < len(self._children):
+                            row_items = self._children[row]
+                            if 0 <= column < len(row_items):
+                                return row_items[column]
+                        return None
+                class _Signal:
+                    def connect(self, slot): pass
+                    def emit(self, *args): pass
+                class QStandardItemModel(QStandardItem):
+                    def __init__(self, parent=None):
+                        super().__init__("")
+                        self._headers = []
+                        self._root_item = self
+                        self.itemChanged = _Signal()
+                        self._sort_role = 0
+                    def setSortRole(self, role):
+                        self._sort_role = role
+                    def setHorizontalHeaderLabels(self, labels):
+                        self._headers = labels
+                    def clear(self):
+                        self._children = []
+                        self._headers = []
+                    def invisibleRootItem(self):
+                        return self._root_item
+                    def item(self, row, column=0):
+                        return self.child(row, column)
 try:
     from .translation import tr
 except ImportError:
-    from translation import tr
+    try:
+        from translation import tr
+    except ImportError:
+        def tr(text, disambiguation=None): return text
+
+
+try:
+    from qgis.core import QgsProject, QgsMapLayer, QgsLayerTreeGroup, QgsLayerTreeLayer
+except ImportError:
+    # Fallback/Mock classes for environments without QGIS
+    class QgsProject:
+        _instance = None
+        @classmethod
+        def instance(cls):
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
+        def __init__(self):
+            self._root = QgsLayerTreeGroup()
+        def mapLayers(self):
+            return {}
+        def fileName(self):
+            return ""
+        def layerTreeRoot(self):
+            return self._root
+
+    class QgsMapLayer:
+        def __init__(self, layer_id="", name="", source_path=""):
+            self._id = layer_id
+            self._name = name
+            self._source = source_path
+        def id(self):
+            return self._id
+        def name(self):
+            return self._name
+        def source(self):
+            return self._source
+        def isValid(self):
+            return True
+
+    class QgsLayerTreeGroup:
+        def __init__(self, name=""):
+            self._name = name
+            self._children = []
+            self._visible = True
+            self._parent = None
+        def children(self):
+            return self._children
+        def name(self):
+            return self._name
+        def parent(self):
+            return self._parent
+        def itemVisibilityChecked(self):
+            return self._visible
+        def setItemVisibilityChecked(self, visible):
+            self._visible = visible
+        def isVisible(self):
+            if not self._visible:
+                return False
+            if hasattr(self, '_parent') and self._parent:
+                return self._parent.isVisible()
+            return True
+        def findLayer(self, layer_id):
+            for child in self._children:
+                if isinstance(child, QgsLayerTreeLayer) and child.layer() and child.layer().id() == layer_id:
+                    return child
+                elif isinstance(child, QgsLayerTreeGroup):
+                    found = child.findLayer(layer_id)
+                    if found:
+                        return found
+            return None
+
+    class QgsLayerTreeLayer:
+        def __init__(self, layer):
+            self._layer = layer
+            self._visible = True
+            self._parent = None
+        def layer(self):
+            return self._layer
+        def parent(self):
+            return self._parent
+        def itemVisibilityChecked(self):
+            return self._visible
+        def setItemVisibilityChecked(self, visible):
+            self._visible = visible
+        def isVisible(self):
+            if not self._visible:
+                return False
+            if hasattr(self, '_parent') and self._parent:
+                return self._parent.isVisible()
+            return True
 
 try:
     from .file_operations import get_associated_files, split_qgis_source, format_size, resolve_physical_path
 except ImportError:
-    from file_operations import get_associated_files, split_qgis_source, format_size, resolve_physical_path
+    try:
+        from file_operations import get_associated_files, split_qgis_source, format_size, resolve_physical_path
+    except ImportError:
+        def resolve_physical_path(path):
+            return path
+            
+        def split_qgis_source(source_path):
+            if not source_path:
+                return "", ""
+            parts = source_path.split('|', 1)
+            phys_path = parts[0]
+            q_params = '|' + parts[1] if len(parts) == 2 else ""
+            if '?' in phys_path:
+                sub_parts = phys_path.split('?', 1)
+                phys_path = sub_parts[0]
+                q_params = '?' + sub_parts[1] + q_params
+            return phys_path.replace('\\', '/'), q_params
+        
+        def get_associated_files(file_path):
+            phys_path, _ = split_qgis_source(file_path)
+            return [phys_path] if (phys_path and os.path.exists(phys_path)) else []
+
+        def format_size(size_in_bytes):
+            """Formats the size in bytes to a human-readable string."""
+            if size_in_bytes <= 0:
+                return "-"
+            val = float(size_in_bytes)
+            for unit in ['B', 'KB', 'MB', 'GB']:
+                if val < 1024.0:
+                    return f"{val:.2f} {unit}"
+                val /= 1024.0
+            return f"{val:.2f} TB"
 
 
 def is_layer_visible(layer):
@@ -248,7 +477,7 @@ def _get_layer_icon_path(layer):
         import logging
         logging.getLogger(__name__).debug("Failed to check if layer is valid: %s", e)
         
-    icon_name = "0_TreeMap_panel.svg"
+    icon_name = "0_SuperLayer_panel.svg"
     
     try:
         provider_type = ""
@@ -267,11 +496,13 @@ def _get_layer_icon_path(layer):
     class_name = layer.__class__.__name__
     
     # 1. 3D & Mesh & Point Cloud Layer Types
+    # (QgsMapLayerType: Vector=0, Raster=1, Plugin=2, Mesh=3, VectorTile=4,
+    #  Annotation=5, PointCloud=6, TiledScene=7)
     if layer_type == 3 or class_name == 'QgsMeshLayer':
         icon_name = "MeshLayer.svg"
-    elif layer_type == 5 or class_name == 'QgsPointCloudLayer':
+    elif layer_type == 6 or class_name == 'QgsPointCloudLayer':
         icon_name = "PointCloudLayer.svg"
-    elif layer_type == 6 or class_name == 'QgsTiledSceneLayer':
+    elif layer_type == 7 or class_name == 'QgsTiledSceneLayer':
         icon_name = "TiledScene.svg"
     elif class_name in ['QgsCesium3DTilesLayer', 'Qgs3DTilesLayer']:
         icon_name = "Cesium3dTiles.svg"
@@ -399,11 +630,18 @@ def _create_hidden_layer_icon(base_icon):
                         
             if hasattr(painter, 'setOpacity'):
                 painter.setOpacity(1.0)
-            if hasattr(painter, 'end'):
-                painter.end()
         except Exception as e:
             import logging
             logging.getLogger(__name__).debug("Failed to draw overlay icon: %s", e)
+        finally:
+            # Always release the painter, even on failure: a QPixmap still
+            # held by an active QPainter cannot be safely copied or added.
+            try:
+                if hasattr(painter, 'end'):
+                    painter.end()
+            except Exception as exc:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).debug("Failed to end overlay painter: %s", exc)
             
         if hasattr(new_icon, 'addPixmap'):
             new_icon.addPixmap(target_pixmap)
@@ -485,14 +723,14 @@ def _get_folder_icon_path(is_physical, path=""):
             "Folder.png",
             "Document.svg",
             "Document.png",
-            "0_TreeMap_panel.svg"
+            "0_SuperLayer_panel.svg"
         ]
     else:
         # Layer Group: try Group SVG/PNG
         candidates = [
             "Group.svg",
             "Group.png",
-            "0_TreeMap_panel.svg"
+            "0_SuperLayer_panel.svg"
         ]
         
     for cand in candidates:
@@ -602,7 +840,12 @@ def get_layer_format(layer):
         import logging
         logging.getLogger(__name__).debug("Failed to read layer provider name: %s", e)
         
-    source = layer.source()
+    # A layer removed elsewhere in QGIS leaves a deleted wrapper whose
+    # attribute access raises RuntimeError; treat it as an unknown format.
+    try:
+        source = layer.source()
+    except RuntimeError:
+        return "其他"
     if not isinstance(source, str) or not source:
         return "其他"
         

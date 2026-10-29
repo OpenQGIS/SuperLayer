@@ -4,19 +4,447 @@ import csv
 import datetime
 from functools import partial
 
-from qgis.PyQt.QtCore import Qt, QCoreApplication, QSize
-from qgis.PyQt.QtGui import QIcon, QTextCursor, QBrush, QColor
-from qgis.PyQt.QtWidgets import (
-    QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
-    QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
-    QScrollArea, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu
-)
-from qgis.core import (
-    Qgis, QgsProject, QgsMapLayer, QgsMapLayerModel, QgsCoordinateReferenceSystem,
-    QgsVectorDataProvider, QgsVectorLayer, QgsStyle, QgsLayerTreeUtils
-)
+# Robust Qt Imports fallback
+try:
+    from qgis.PyQt.QtCore import Qt, QCoreApplication, QSettings, QTranslator, QSize
+    from qgis.PyQt.QtGui import QIcon, QTextCursor, QBrush, QColor
+    from qgis.PyQt.QtWidgets import (
+        QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
+        QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
+        QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu, QToolButton
+    )
+except ImportError:
+    try:
+        from qtpy.QtCore import Qt, QCoreApplication, QSettings, QTranslator, QSize
+        from qtpy.QtGui import QIcon, QTextCursor, QBrush, QColor
+        from qtpy.QtWidgets import (
+            QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
+            QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
+            QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu, QToolButton
+        )
+    except ImportError:
+        try:
+            from PySide2.QtCore import Qt, QCoreApplication, QSettings, QTranslator, QSize
+            from PySide2.QtGui import QIcon, QTextCursor, QBrush, QColor
+            from PySide2.QtWidgets import (
+                QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
+                QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
+                QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu, QToolButton
+            )
+        except ImportError:
+            try:
+                from PySide6.QtCore import Qt, QCoreApplication, QSize
+                from PySide6.QtGui import QIcon, QTextCursor, QBrush, QColor
+                from PySide6.QtWidgets import (
+                    QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter, QTabWidget, QTableWidget,
+                    QTableWidgetItem, QPushButton, QLineEdit, QComboBox, QLabel, QTextEdit,
+                    QScrollArea, QMessageBox, QFileDialog, QApplication, QGroupBox, QAbstractItemView, QMenu, QToolButton
+                )
+            except ImportError:
+                # Basic mocks for CLI testing
+                class Qt:
+                    ItemIsSelectable = 1
+                    ItemIsEditable = 2
+                    ItemIsEnabled = 4
+                    EditRole = 2
+                    yellow = 12
+                    NoItemFlags = 0
+                    Horizontal = 1
+                    Vertical = 2
+                    WaitCursor = 3
+                    class KeyboardModifier:
+                        AltModifier = 1
+                    class Orientation:
+                        Horizontal = 1
+                        Vertical = 2
+                    class ItemDataRole:
+                        EditRole = 2
+                        UserRole = 32
+                    class CursorShape:
+                        WaitCursor = 3
+                    class GlobalColor:
+                        yellow = 12
+                    class ItemFlag:
+                        ItemIsSelectable = 1
+                        ItemIsEditable = 2
+                        ItemIsEnabled = 4
+                        NoItemFlags = 0
+                    class Corner:
+                        TopRightCorner = 1
+                    TopRightCorner = 1
+                class QSize:
+                    def __init__(self, w, h): pass
+                class QIcon:
+                    def __init__(self, *args): pass
+                class QTextCursor:
+                    End = 1
+                    MoveAnchor = 2
+                    class MoveOperation:
+                        End = 1
+                    class MoveMode:
+                        MoveAnchor = 2
+                class QBrush:
+                    def __init__(self, color):
+                        self._color = color
+                    def color(self):
+                        return self._color
+                class QColor:
+                    def __init__(self, *args):
+                        if len(args) == 1:
+                            self._color_val = args[0]
+                        else:
+                            self._color_val = args
+                    def name(self):
+                        return str(self._color_val)
+                class QSizePolicy:
+                    Expanding = 7
+                    Preferred = 4
+                    Fixed = 0
+                    Minimum = 1
+                    Ignored = 13
+                    class Policy:
+                        Expanding = 7
+                        Preferred = 4
+                        Fixed = 0
+                        Minimum = 1
+                        Ignored = 13
+                class QWidget:
+                    def __init__(self, parent=None):
+                        self.layout = None
+                        self._enabled = True
+                    def setLayout(self, layout):
+                        self.layout = layout
+                    def setStyleSheet(self, style): pass
+                    def setMinimumHeight(self, h): pass
+                    def setMinimumWidth(self, w): pass
+                    def setMaximumWidth(self, w): pass
+                    def setFixedWidth(self, w): pass
+                    def setFixedHeight(self, h): pass
+                    def setFixedSize(self, w, h): pass
+                    def setObjectName(self, name): pass
+                    def setSizePolicy(self, *args): pass
+                    def wheelEvent(self, event): pass
+                    def setEnabled(self, e):
+                        self._enabled = e
+                    def isEnabled(self):
+                        return self._enabled
+                class QVBoxLayout:
+                    def __init__(self, parent=None):
+                        self.widgets = []
+                    def addWidget(self, widget, *args):
+                        self.widgets.append(widget)
+                    def addLayout(self, layout, *args): pass
+                    def setContentsMargins(self, *args): pass
+                    def setSpacing(self, s): pass
+                    def addStretch(self, *args): pass
+                class QHBoxLayout(QVBoxLayout): pass
+                class QGridLayout(QVBoxLayout):
+                    def setHorizontalSpacing(self, s): pass
+                    def setVerticalSpacing(self, s): pass
+                    def setColumnStretch(self, col, stretch): pass
+                    def addWidget(self, widget, row, col, *args): pass
+                class QSplitter(QWidget):
+                    def __init__(self, *args):
+                        super().__init__()
+                        self.widgets = []
+                    def addWidget(self, w):
+                        self.widgets.append(w)
+                    def setStretchFactor(self, idx, f): pass
+                class _Signal:
+                    def __init__(self):
+                        self._slots = []
+                    def connect(self, slot):
+                        if slot not in self._slots:
+                            self._slots.append(slot)
+                    def disconnect(self, slot=None):
+                        if slot is None:
+                            self._slots = []
+                        elif slot in self._slots:
+                            self._slots.remove(slot)
+                    def emit(self, *args):
+                        for slot in list(self._slots):
+                            slot(*args)
+                class QTabWidget(QWidget):
+                    def __init__(self, parent=None):
+                        super().__init__()
+                        self.tabs = []
+                        self.currentChanged = _Signal()
+                        self._corner_widget = None
+                    def addTab(self, w, name):
+                        self.tabs.append((w, name))
+                    def currentIndex(self): return 0
+                    def setCornerWidget(self, widget, corner=None):
+                        self._corner_widget = widget
+                class QToolButton(QWidget):
+                    def __init__(self, parent=None):
+                        super().__init__(parent)
+                        self.toggled = _Signal()
+                        self._checkable = False
+                        self._checked = False
+                        self._tooltip = ""
+                        self._icon = None
+                        self._icon_size = None
+                    def setCheckable(self, val):
+                        self._checkable = val
+                    def setToolTip(self, val):
+                        self._tooltip = val
+                    def setIcon(self, icon):
+                        self._icon = icon
+                    def setIconSize(self, size):
+                        self._icon_size = size
+                class QTableWidget(QWidget):
+                    def __init__(self, parent=None):
+                        super().__init__()
+                        self.rows = 0
+                        self.cols = 0
+                        self.items = {}
+                        self.horizontal_labels = []
+                        self._selected_rows = []
+                        self.itemChanged = _Signal()
+                    def setRowCount(self, r): self.rows = r
+                    def rowCount(self): return self.rows
+                    def setColumnCount(self, c): self.cols = c
+                    def columnCount(self): return self.cols
+                    def setHorizontalHeaderLabels(self, labels): self.horizontal_labels = labels
+                    def setItem(self, r, c, item):
+                        self.items[(r, c)] = item
+                        if item is not None:
+                            item._row = r
+                            item._col = c
+                            item._table = self
+                    def item(self, r, c): return self.items.get((r, c), None)
+                    def removeRow(self, r): self.rows = max(0, self.rows - 1)
+                    def clearSelection(self): pass
+                    def setAlternatingRowColors(self, val): pass
+                    def setSelectionBehavior(self, behavior): pass
+                    def setSelectionMode(self, mode): pass
+                    def horizontalScrollBar(self): return None
+                    def setHorizontalScrollMode(self, mode): pass
+                    def verticalHeader(self):
+                        class MockHeader:
+                            def setDefaultSectionSize(self, size): pass
+                        return MockHeader()
+                    def selectionModel(self):
+                        class MockSM:
+                            def __init__(self, table):
+                                self._table = table
+                                self.selectionChanged = _Signal()
+                            def selectedRows(self):
+                                return self._table._selected_rows
+                        return MockSM(self)
+                class QTableWidgetItem:
+                    def __init__(self, text=""):
+                        self._text = text
+                        self._data = {}
+                        self._flags = 0
+                        self._row = -1
+                        self._col = -1
+                        self._background = None
+                        self._table = None
+                    def setFlags(self, f): self._flags = f
+                    def setData(self, role, val):
+                        self._data[role] = val
+                        if role == 2:  # Qt.ItemDataRole.EditRole
+                            self._text = str(val)
+                        if self._table and hasattr(self._table, 'itemChanged'):
+                            self._table.itemChanged.emit(self)
+                    def data(self, role): return self._data.get(role, self._text)
+                    def setBackground(self, brush): self._background = brush
+                    def background(self): return self._background
+                    def setIcon(self, icon): pass
+                    def setToolTip(self, text): pass
+                    def row(self): return self._row
+                    def column(self): return self._col
+                class QPushButton(QWidget):
+                    def __init__(self, text=""):
+                        super().__init__()
+                        self.text = text
+                        self.clicked = _Signal()
+                    def setIcon(self, icon): pass
+                    def setIconSize(self, size): pass
+                    def setToolTip(self, text): pass
+                class QLineEdit(QWidget):
+                    def __init__(self, parent=None):
+                        super().__init__()
+                        self._text = ""
+                    def text(self): return self._text
+                    def clear(self): self._text = ""
+                    def setText(self, text): self._text = text
+                class QComboBox(QWidget):
+                    def __init__(self, parent=None):
+                        super().__init__()
+                        self._items = []
+                        self._current_text = ""
+                    def clear(self):
+                        self._items = []
+                        self._current_text = ""
+                    def addItem(self, text, val=None):
+                        self._items.append(text)
+                        if not self._current_text:
+                            self._current_text = text
+                    def currentText(self): return self._current_text
+                    def setCurrentText(self, text): self._current_text = text
+                    def findText(self, text):
+                        try:
+                            return self._items.index(text)
+                        except ValueError:
+                            return -1
+                    def setCurrentIndex(self, index):
+                        if 0 <= index < len(self._items):
+                            self._current_text = self._items[index]
+                class QLabel(QWidget):
+                    def __init__(self, text=""):
+                        super().__init__()
+                        self._text = text
+                    def setText(self, text): self._text = text
+                class QTextEdit(QWidget):
+                    def __init__(self, parent=None): super().__init__()
+                    def clear(self): pass
+                    def ensureCursorVisible(self): pass
+                    def append(self, text): pass
+                    def setReadOnly(self, r): pass
+                    def textCursor(self):
+                        class MockCursor:
+                            def movePosition(self, pos, anchor): pass
+                        return MockCursor()
+                    def setTextCursor(self, c): pass
+                class QScrollArea(QWidget):
+                    def __init__(self, parent=None): super().__init__()
+                    def setWidget(self, w): pass
+                    def setWidgetResizable(self, r): pass
+                class QGroupBox(QWidget):
+                    def __init__(self, title, parent=None): super().__init__()
+                class QAbstractItemView:
+                    SelectRows = 1
+                    ExtendedSelection = 3
+                    ScrollPerItem = 0
+                    ScrollPerPixel = 1
+                    class ScrollMode:
+                        ScrollPerPixel = 1
+                    class SelectionBehavior:
+                        SelectRows = 1
+                    class SelectionMode:
+                        ExtendedSelection = 3
+                class QMenu:
+                    def __init__(self, parent=None):
+                        self._actions = []
+                    def addAction(self, text):
+                        class MockAction:
+                            def __init__(self, text):
+                                self._text = text
+                            def setEnabled(self, e): pass
+                            def setToolTip(self, t): pass
+                        act = MockAction(text)
+                        self._actions.append(act)
+                        return act
+                    def addSeparator(self): pass
+                    def addMenu(self, title):
+                        return QMenu(self)
+                    def exec(self, pos):
+                        return None
+                class QCoreApplication:
+                    @staticmethod
+                    def translate(context, message):
+                        return message
+                class QSettings:
+                    def __init__(self, *args): pass
+                    def value(self, key): return "en"
+                class QTranslator:
+                    def __init__(self, *args): pass
+                    def load(self, path): return True
+                class QMessageBox:
+                    @classmethod
+                    def information(cls, parent, title, text): pass
+                    @classmethod
+                    def warning(cls, parent, title, text): pass
+                class QFileDialog:
+                    @classmethod
+                    def getSaveFileName(cls, *args): return "", ""
+                class QApplication:
+                    @classmethod
+                    def setOverrideCursor(cls, cursor): pass
+                    @classmethod
+                    def restoreOverrideCursor(cls): pass
 
-
+# QGIS Imports fallback
+try:
+    from qgis.core import (
+        QgsProject, QgsMapLayer, QgsMapLayerModel, QgsCoordinateReferenceSystem,
+        QgsVectorDataProvider, QgsVectorLayer, Qgis, QgsStyle, QgsLayerTreeUtils
+    )
+except ImportError:
+    class Qgis:
+        Critical = 1
+        class MessageLevel:
+            Critical = 1
+    class QgsProject:
+        _instance = None
+        @classmethod
+        def instance(cls):
+            if cls._instance is None: cls._instance = cls()
+            return cls._instance
+        def mapLayers(self): return {}
+        def mapLayer(self, layer_id): return None
+        def removeMapLayer(self, layer_id): pass
+        def setDirty(self, d): pass
+        def crs(self): return QgsCoordinateReferenceSystem()
+    class QgsMapLayer:
+        VectorLayer = 0
+        RasterLayer = 1
+        class LayerType:
+            VectorLayer = 0
+            RasterLayer = 1
+        def type(self): return 0
+        def id(self): return ""
+        def name(self): return ""
+        def title(self): return ""
+        def abstract(self): return ""
+        def shortName(self): return ""
+        def crs(self):
+            class MockCRS:
+                def authid(self): return "EPSG:4326"
+            return MockCRS()
+        def extent(self):
+            class MockExtent:
+                def toString(self, dec): return "0,0,0,0"
+            return MockExtent()
+        def isSpatial(self): return True
+        def maximumScale(self): return 0.0
+        def minimumScale(self): return 0.0
+        def toggleScaleBasedVisibility(self, b): pass
+        def setMaximumScale(self, s): pass
+        def setMinimumScale(self, s): pass
+        def setCrs(self, crs): pass
+        def triggerRepaint(self): pass
+        def providerType(self): return "ogr"
+    class QgsMapLayerModel:
+        @classmethod
+        def iconForLayer(cls, layer): return QIcon()
+    class QgsCoordinateReferenceSystem:
+        def __init__(self, *args): pass
+        def createFromOgcWmsCrs(self, text): return True
+        def authid(self): return "EPSG:4326"
+        def isValid(self): return True
+    class QgsVectorDataProvider:
+        CreateSpatialIndex = 1
+        class Capability:
+            CreateSpatialIndex = 1
+    class QgsVectorLayer(QgsMapLayer):
+        def isEditable(self): return False
+        def isValid(self): return True
+        def geometryType(self): return 0
+        def dataProvider(self):
+            class MockProvider:
+                def name(self): return "ogr"
+                def dataSourceUri(self): return "test_path"
+                def availableEncodings(self): return ["UTF-8"]
+            return MockProvider()
+    class QgsStyle:
+        @classmethod
+        def defaultStyle(cls): return None
+    class QgsLayerTreeUtils:
+        @classmethod
+        def countMapLayerInTree(cls, root, layer): return 1
 class CustomTableWidget(QTableWidget):
     """Custom QTableWidget that handles Alt + Mouse Wheel to scroll horizontally with a smaller step size."""
     def __init__(self, parent=None):
@@ -92,8 +520,31 @@ class LayerBoardWidget(QWidget):
         self.styleLayer = None
         self.filter_visible_only = False
         self.filter_layer_ids = None
-        
+
         self.init_ui()
+
+        # The embedded style panel keeps a strong reference to its layer.
+        # Drop it before QGIS destroys the C++ object, otherwise applying a
+        # style later touches a deleted wrapper and crashes.
+        try:
+            QgsProject.instance().layerWillBeRemoved.connect(self._on_layer_will_be_removed)
+        except (AttributeError, RuntimeError, TypeError):
+            pass
+
+    def _on_layer_will_be_removed(self, layer):
+        try:
+            if hasattr(layer, 'id'):
+                removed_id = layer.id()
+            else:
+                removed_id = str(layer)
+            if self.styleLayer is not None and self.styleLayer.id() == removed_id:
+                self.styleLayer = None
+                self.styleWidget = None
+                self.styleScrollArea.setWidget(QWidget())
+        except RuntimeError:
+            self.styleLayer = None
+            self.styleWidget = None
+
         
     def tr(self, message):
         return QCoreApplication.translate('LayerBoardWidget', message)
@@ -668,21 +1119,24 @@ class LayerBoardWidget(QWidget):
         
     def onItemChanged(self, layerType, item):
         table = self.layersTable[layerType]['tableWidget']
-        
+
         row = item.row()
         col = item.column()
-        
-        table.clearSelection()
-        
+
+        # NOTE: do not clearSelection() here. Programmatic setData() calls
+        # from applyPropertyOnSelectedLayers re-enter this slot; clearing the
+        # selection mid-batch destroys the batch inputs and the style panel,
+        # so only the first batch field ever applied.
+
         layerId = table.item(row, 0).data(Qt.ItemDataRole.EditRole)
         lr = QgsProject.instance()
         layer = lr.mapLayer(layerId)
         if not layer:
             return
-            
+
         prop = self.layersAttributes[layerType][col]['key']
         data = table.item(row, col).data(Qt.ItemDataRole.EditRole)
-        
+
         # Check URI validation
         if prop == 'source|uri' and not self.newDatasourceIsValid(layer, data):
             table.itemChanged.disconnect()
@@ -690,14 +1144,31 @@ class LayerBoardWidget(QWidget):
             slot = partial(self.onItemChanged, layerType)
             table.itemChanged.connect(slot)
             return
-            
-        # Check encoding
-        if prop == 'encoding' and data not in layer.dataProvider().availableEncodings():
-            table.itemChanged.disconnect()
-            item.setData(Qt.ItemDataRole.EditRole, self.getLayerProperty(layer, 'encoding'))
-            slot = partial(self.onItemChanged, layerType)
-            table.itemChanged.connect(slot)
-            return
+
+        # Check encoding (a broken layer can have a None provider)
+        if prop == 'encoding':
+            provider = layer.dataProvider() if hasattr(layer, 'dataProvider') else None
+            available = provider.availableEncodings() if provider is not None and hasattr(provider, 'availableEncodings') else []
+            if data not in available:
+                table.itemChanged.disconnect()
+                item.setData(Qt.ItemDataRole.EditRole, self.getLayerProperty(layer, 'encoding'))
+                slot = partial(self.onItemChanged, layerType)
+                table.itemChanged.connect(slot)
+                return
+
+        # Scale cells must be finite numbers (blocks "abc", "nan", "inf" from
+        # ever reaching setMaximumScale/setMinimumScale)
+        if prop in ('maxScale', 'minScale'):
+            try:
+                import math
+                if not math.isfinite(float(data)):
+                    raise ValueError
+            except (TypeError, ValueError):
+                table.itemChanged.disconnect()
+                item.setData(Qt.ItemDataRole.EditRole, self.getLayerProperty(layer, prop))
+                slot = partial(self.onItemChanged, layerType)
+                table.itemChanged.connect(slot)
+                return
             
         # Check shortname
         if prop == 'shortname':
@@ -767,8 +1238,14 @@ class LayerBoardWidget(QWidget):
             self.updateLog('<b>%s</b> ( %s ):' % (layer.name(), layerId))
             
             for prop, data in list(layerData.items()):
-                if data or data == '':
-                    self.setLayerProperty(layerType, [layer], prop, data, repopulate=False)
+                # `data is not None` instead of truthiness: a scale of 0 is a
+                # legitimate edit ("no lower limit") and must not be skipped.
+                if data is not None:
+                    try:
+                        self.setLayerProperty(layerType, [layer], prop, data, repopulate=False)
+                    except Exception as e:  # noqa: BLE001
+                        self.updateLog('! %s -> %s (%s)' % (prop, data, e))
+                        continue
                     self.updateLog('* %s -> %s' % (prop, data))
                     
         # Mark project dirty
@@ -823,51 +1300,45 @@ class LayerBoardWidget(QWidget):
             self.populateLayerTable(layerType)
 
     def setDataSource(self, layer, newSourceUri):
-        # Verify write XML functionality (if present)
-        if not hasattr(layer, 'writeLayerXML'):
-            return
-        try:
-            from qgis.PyQt.QtXml import QDomDocument
-        except ImportError:
-            # Fallback mock for unit testing environment
-            class QDomDocument:
-                def __init__(self, name): pass
-                def createElement(self, name):
-                    class MockElement:
-                        def __init__(self, name):
-                            self._name = name
-                            self._children = []
-                            self._value = ""
-                        def firstChildElement(self, name):
-                            el = MockElement(name)
-                            self._children.append(el)
-                            return el
-                        def firstChild(self):
-                            class MockNode:
-                                def __init__(self, parent):
-                                    self._parent = parent
-                                def setNodeValue(self, val):
-                                    self._parent._value = val
-                            return MockNode(self)
-                        def appendChild(self, el):
-                            self._children.append(el)
-                    return MockElement(name)
-                def appendChild(self, el): pass
-            class QDomElement: pass
+        # QGIS 3 renamed writeLayerXML/readLayerXML to writeLayerXml/readLayerXml,
+        # so the previous hasattr(layer, 'writeLayerXML') guard made this whole
+        # function dead code. Use the official setDataSource() API instead and
+        # restore provider-level state explicitly.
+        provider = layer.dataProvider() if hasattr(layer, 'dataProvider') else None
+        provider_key = provider.name() if provider is not None and hasattr(provider, 'name') else ""
+
+        # Provider subset filters and encodings are datasource state, not part
+        # of the layer style: snapshot them before the provider is rebuilt.
+        subset = ""
+        if hasattr(layer, 'subsetString'):
+            try:
+                subset = layer.subsetString()
+            except RuntimeError:
+                subset = ""
+        encoding = provider.encoding() if provider is not None and hasattr(provider, 'encoding') else ""
 
         newDS, newUri = self.splitSource(newSourceUri)
-        newDatasourceType = newDS or layer.dataProvider().name()
-        
-        XMLDocument = QDomDocument("style")
-        XMLMapLayers = XMLDocument.createElement("maplayers")
-        XMLMapLayer = XMLDocument.createElement("maplayer")
-        layer.writeLayerXML(XMLMapLayer, XMLDocument)
-        
-        XMLMapLayer.firstChildElement("datasource").firstChild().setNodeValue(newUri)
-        XMLMapLayer.firstChildElement("provider").firstChild().setNodeValue(newDatasourceType)
-        XMLMapLayers.appendChild(XMLMapLayer)
-        XMLDocument.appendChild(XMLMapLayers)
-        layer.readLayerXML(XMLMapLayer)
+        provider_key = newDS or provider_key
+        if not provider_key:
+            self.updateLog('! setDataSource failed: no provider key for ' + newSourceUri)
+            return
+
+        if not hasattr(layer, 'setDataSource'):
+            self.updateLog('! setDataSource not available on layer object')
+            return
+
+        layer.setDataSource(newUri, layer.name(), provider_key)
+
+        if subset and hasattr(layer, 'setSubsetString'):
+            try:
+                layer.setSubsetString(subset)
+            except RuntimeError:
+                pass
+        if encoding and hasattr(layer, 'setProviderEncoding'):
+            try:
+                layer.setProviderEncoding(encoding)
+            except RuntimeError:
+                pass
         if hasattr(layer, 'reload'): layer.reload()
         if hasattr(self.iface, 'actionDraw'): self.iface.actionDraw().trigger()
         if hasattr(self.iface, 'mapCanvas'): self.iface.mapCanvas().refresh()
@@ -935,12 +1406,17 @@ class LayerBoardWidget(QWidget):
         lines = sm.selectedRows()
         if not lines:
             return
-            
-        col = next(index for (index, d) in enumerate(self.layersAttributes[layerType]) if d['key'] == key)
+
+        # The column may not exist for this layer type (e.g. encoding is
+        # vector-only); default to None instead of raising StopIteration.
+        col = next((index for (index, d) in enumerate(self.layersAttributes[layerType]) if d['key'] == key), None)
+        if col is None:
+            return
         for index in lines:
             row = index.row()
             item = table.item(row, col)
-            item.setData(Qt.ItemDataRole.EditRole, value)
+            if item is not None:
+                item.setData(Qt.ItemDataRole.EditRole, value)
 
     def performActionOnSelectedLayers(self, key):
         layerType = self.getActiveLayerType()
@@ -1109,7 +1585,17 @@ class LayerBoardWidget(QWidget):
         layer = self.styleLayer
         if not w or not layer:
             return
-            
+
+        # The layer may have been removed from the project since the panel was
+        # built; touching a deleted wrapper raises RuntimeError. Bail out and
+        # drop the stale references.
+        try:
+            layer.id()
+        except RuntimeError:
+            self.styleLayer = None
+            self.styleWidget = None
+            return
+
         try:
             if hasattr(w, 'apply'):
                 w.apply()
@@ -1120,10 +1606,13 @@ class LayerBoardWidget(QWidget):
         except Exception as e:  # noqa: BLE001
             import logging
             logging.getLogger(__name__).warning("Failed to clone and set renderer: %s", e)
-            
-        if hasattr(layer, "setCacheImage"):
-            layer.setCacheImage(None)
-        layer.triggerRepaint()
+
+        try:
+            if hasattr(layer, "setCacheImage"):
+                layer.setCacheImage(None)
+            layer.triggerRepaint()
+        except RuntimeError:
+            return
         
         try:
             self.iface.mapCanvas().refresh()

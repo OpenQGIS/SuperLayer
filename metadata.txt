@@ -3,7 +3,7 @@ name=SuperLayer
 qgisMinimumVersion=3.0
 qgisMaximumVersion=4.99
 description=使用分组树、文件夹树、思维导图、矩形树图或图层属性看板管理工程图层，支持地图主题过滤、同组拖动排序，以及移动、复制、备份物理文件和完整图层样式。/ Manage project layers with group and folder trees, mind maps, treemaps, or a layer property board, with map-theme filtering, same-group drag ordering, physical file operations, and complete layer-style transfer.
-version=2.6.3
+version=2.6.4
 author=OpenQGIS
 email=OpenQGIS@outlook.com
 about=通过分组树、文件夹树、思维导图、矩形树图和属性看板查看与管理 QGIS 图层。支持按当前画布或 QGIS 地图主题过滤图层、同组原生拖放排序、重复数据源大小去重、多选批量修改，以及移动、复制、备份物理文件并保留完整图层配置。/ View and manage QGIS layers through group and folder trees, mind maps, treemaps, and a property board. Filter by live canvas visibility or QGIS map themes, reorder layers within a group, avoid duplicate treemap sizes for shared data sources, batch-edit layer properties, and move, copy, or back up physical files while preserving complete layer configuration.
@@ -14,8 +14,11 @@ homepage=https://github.com/OpenQGIS/SuperLayer
 category=Plugins
 icon=icons/SuperLayer.png
 changelog=
-    Version 2.6.3:
-    - 🛠️ 清除 Flake8 E741 代码质量警告。 / clearing Flake8 E741 quality warnings.
+    Version 2.6.4:
+    - 🛡️ 移动、复制或重命名图层文件时，原始数据在任何一步出错（磁盘占满、意外中断、副本校验不通过）都会自动回滚保护，不再出现数据丢失或图层失去数据源。/ Moving, copying, or renaming layer files now rolls back automatically whenever any step fails (disk full, unexpected interruption, failed copy verification), so data loss and layers losing their source no longer occur.
+    - 🐛 复制与导出图层不再丢失过滤表达式。/ Copying and exporting layers no longer loses filter expressions.
+    - 🐛 修复属性看板中修改数据源与批量修改不生效的问题。/ Fixed datasource editing and batch updates in the Layer Board not taking effect.
+    - ✨ 思维导图支持框选多个图层整批拖拽迁移。/ The mind map can now relocate rubber-band selected layers in one drag.
 
     Version 2.6.2:
     - 🐛 修复 Windows 下重命名 Shapefile 后旧 .shp 与 .dbf 文件因数据源锁未及时释放而残留的问题。 / Fixed old .shp and .dbf files remaining after Shapefile renaming on Windows when data-source locks were released late.

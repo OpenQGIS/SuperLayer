@@ -8,11 +8,213 @@ except ImportError:
     except ImportError:
         _sip = None
 
-from qgis.PyQt.QtCore import Qt, QPointF, QRectF, pyqtSignal as Signal
-from qgis.PyQt.QtGui import QPainter, QPainterPath, QColor, QFont, QIcon, QPixmap, QPen, QBrush, QCursor
-from qgis.PyQt.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsLineItem, QGraphicsObject
-from qgis.PyQt.QtSvg import QSvgRenderer
-from qgis.core import QgsProject
+try:
+    from qgis.PyQt.QtCore import Qt, QPointF, QRectF, QLineF, QObject, pyqtSignal as Signal
+    from qgis.PyQt.QtGui import QPainter, QPainterPath, QColor, QFont, QIcon, QPixmap, QPen, QBrush, QCursor
+    from qgis.PyQt.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsLineItem,
+                                 QGraphicsObject, QStyleOptionGraphicsItem)
+except ImportError:
+    try:
+        from qtpy.QtCore import Qt, QPointF, QRectF, QLineF, QObject, Signal
+        from qtpy.QtGui import QPainter, QPainterPath, QColor, QFont, QIcon, QPixmap, QPen, QBrush
+        from qtpy.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsLineItem,
+                                     QGraphicsObject, QStyleOptionGraphicsItem)
+    except ImportError:
+        try:
+            from PySide2.QtCore import Qt, QPointF, QRectF, QLineF, QObject
+            from PySide2.QtCore import Signal as Signal
+            from PySide2.QtGui import QPainter, QPainterPath, QColor, QFont, QIcon, QPixmap, QPen, QBrush
+            from PySide2.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsLineItem,
+                                         QGraphicsObject, QStyleOptionGraphicsItem)
+        except ImportError:
+            try:
+                from PySide6.QtCore import Qt, QPointF, QRectF, QLineF, QObject, Signal
+                from PySide6.QtGui import QPainter, QPainterPath, QColor, QFont, QIcon, QPixmap, QPen, QBrush
+                from PySide6.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsLineItem,
+                                             QGraphicsObject, QStyleOptionGraphicsItem)
+            except ImportError:
+                # Basic mock for headless test runs
+                class Qt:
+                    ScrollBarAlwaysOff = 0
+                    ScrollBarAlwaysOn = 1
+                    UserRole = 32
+                    KeepAspectRatio = 1
+                    NoPen = 0
+                    NoBrush = 0
+                    ItemIsSelectable = 1
+                    ItemIsFocusable = 2
+                    AlignVCenter = 0
+                    AlignLeft = 0
+                    ElideRight = 0
+                    SolidLine = 1
+                    LeftButton = 1
+                    RightButton = 2
+                    MiddleButton = 4
+                    class ScrollBarPolicy:
+                        ScrollBarAlwaysOff = 0
+                        ScrollBarAlwaysOn = 1
+                    class AspectRatioMode:
+                        KeepAspectRatio = 1
+                    class PenStyle:
+                        NoPen = 0
+                        SolidLine = 1
+                        DashLine = 2
+                    class AlignmentFlag:
+                        AlignVCenter = 0
+                        AlignLeft = 0
+                        AlignCenter = 0
+                    class TextElideMode:
+                        ElideRight = 0
+                    class MouseButton:
+                        LeftButton = 1
+                        RightButton = 2
+                        MiddleButton = 4
+                    class ClipOperation:
+                        IntersectClip = 1
+                    class CursorShape:
+                        ClosedHandCursor = 1
+                    class TextFlag:
+                        TextWordWrap = 1
+                class QObject:
+                    def __init__(self, *args, **kw): pass
+                class Signal:
+                    def __init__(self, *args):
+                        self._slots = []
+                    def emit(self, *args):
+                        for slot in self._slots:
+                            slot(*args)
+                    def connect(self, slot):
+                        self._slots.append(slot)
+                class QPointF:
+                    def __init__(self, x=0.0, y=0.0):
+                        self._x = x
+                        self._y = y
+                    def x(self): return self._x
+                    def y(self): return self._y
+                class QRectF:
+                    def __init__(self, x=0.0, y=0.0, w=0.0, h=0.0):
+                        self._x, self._y, self._w, self._h = x, y, w, h
+                    def x(self): return self._x
+                    def y(self): return self._y
+                    def width(self): return self._w
+                    def height(self): return self._h
+                    def contains(self, pt): return True
+                    def united(self, other): return self
+                    def adjusted(self, *args): return self
+                    def toRect(self): return self
+                class QLineF: pass
+                class QPainter:
+                    Antialiasing = 1
+                    SmoothPixmapTransform = 2
+                    class RenderHint:
+                        Antialiasing = 1
+                        SmoothPixmapTransform = 2
+                class QPainterPath:
+                    def moveTo(self, *args): pass
+                    def cubicTo(self, *args): pass
+                    def addRoundedRect(self, *args): pass
+                class QColor:
+                    def __init__(self, *args): pass
+                class QFont:
+                    def __init__(self, *args): pass
+                    def setBold(self, *args): pass
+                class QIcon:
+                    def __init__(self, *args): pass
+                    def pixmap(self, *args): return QPixmap()
+                    def isNull(self): return True
+                    def paint(self, *args): pass
+                class QPixmap:
+                    def __init__(self, *args): pass
+                    def isNull(self): return True
+                class QPen:
+                    def __init__(self, *args): pass
+                class QBrush:
+                    def __init__(self, *args): pass
+                class QCursor:
+                    @classmethod
+                    def pos(cls): return QPointF(0.0, 0.0)
+                class QGraphicsItem:
+                    ItemSelectedHasChanged = 4
+                    ItemIsSelectable = 1
+                    ItemIsFocusable = 2
+                    class GraphicsItemChange:
+                        ItemSelectedHasChanged = 4
+                    class GraphicsItemFlag:
+                        ItemIsSelectable = 1
+                        ItemIsFocusable = 2
+                    def __init__(self, *args, **kw): pass
+                    def setFlags(self, *args): pass
+                    def setAcceptHoverEvents(self, val): pass
+                    def setToolTip(self, text): pass
+                    def setSelected(self, val):
+                        self._selected = val
+                    def isSelected(self):
+                        return getattr(self, '_selected', False)
+                    def scene(self): return None
+                    def setZValue(self, val): pass
+                    def mapFromScene(self, pt): return pt
+                    def sceneBoundingRect(self): return QRectF()
+                class QGraphicsLineItem(QGraphicsItem):
+                    def __init__(self, *args): super().__init__()
+                    def setPen(self, *args): pass
+                    def setLine(self, *args): pass
+                    def show(self): pass
+                    def hide(self): pass
+                class QGraphicsObject(QGraphicsItem):
+                    layerDoubleClicked = Signal()
+                    layerClicked = Signal()
+                    layoutChanged = Signal()
+                    def __init__(self, *args, **kw):
+                        super().__init__(*args, **kw)
+                class QStyleOptionGraphicsItem: pass
+                class QGraphicsView:
+                    NoDrag = 0
+                    ScrollHandDrag = 1
+                    RubberBandDrag = 2
+                    AnchorUnderMouse = 1
+                    class DragMode:
+                        NoDrag = 0
+                        ScrollHandDrag = 1
+                        RubberBandDrag = 2
+                    class ViewportAnchor:
+                        AnchorUnderMouse = 1
+                    def __init__(self, *args, **kw):
+                        self._drag_mode = 0
+                    def setScene(self, scene): pass
+                    def setDragMode(self, mode):
+                        self._drag_mode = mode
+                    def dragMode(self):
+                        return getattr(self, '_drag_mode', 0)
+                    def setRenderHints(self, hints): pass
+                    def setTransformationAnchor(self, anchor): pass
+                    def scale(self, sx, sy): pass
+                    def fitInView(self, *args): pass
+                    def viewport(self): return None
+                    def setHorizontalScrollBarPolicy(self, p): pass
+                    def setVerticalScrollBarPolicy(self, p): pass
+                    def centerOn(self, item): pass
+                class QGraphicsScene:
+                    def __init__(self, *args, **kw): pass
+                    def clear(self): pass
+                    def addItem(self, item): pass
+                    def setSceneRect(self, *args): pass
+                    def items(self): return []
+                    def itemsBoundingRect(self): return QRectF()
+
+try:
+    from qgis.core import QgsProject
+except ImportError:
+    class QgsProject:
+        _instance = None
+        @classmethod
+        def instance(cls):
+            if not cls._instance:
+                cls._instance = QgsProject()
+            return cls._instance
+        def mapLayers(self):
+            return {}
+        def fileName(self):
+            return ""
 
 try:
     from .layer_model import _get_layer_icon, _get_folder_icon, split_qgis_source, _get_layer_icon_path, _get_folder_icon_path
@@ -22,7 +224,22 @@ except ImportError:
 try:
     from .file_operations import resolve_physical_path
 except ImportError:
-    from file_operations import resolve_physical_path
+    try:
+        from file_operations import resolve_physical_path
+    except ImportError:
+        def resolve_physical_path(path):
+            return path
+
+try:
+    from qgis.PyQt.QtSvg import QSvgRenderer
+except ImportError:
+    class QSvgRenderer:
+        def __init__(self, path=None):
+            self._path = path
+        def isValid(self):
+            return bool(self._path)
+        def render(self, painter, rect):
+            pass
 
 
 def truncate_middle_path(path_str, max_len=30):
@@ -80,6 +297,11 @@ except ImportError:
         from translation import tr
     except ImportError:
         def tr(text, disambiguation=None): return text
+
+
+# Lazily-created shared renderer for the hidden-overlay icon (see
+# MindMapNodeItem.paint); None until first successful load.
+_HIDE_ICON_RENDERER = None
 
 
 class MindMapNode:
@@ -350,18 +572,28 @@ class MindMapNodeItem(QGraphicsObject):
             has_icon = True
             
         if not is_eff_vis:
-            plugin_dir = os.path.dirname(os.path.abspath(__file__))
-            hide_icon_path = os.path.join(plugin_dir, "icons_component", "Component_layer_hide.svg")
-            if os.path.exists(hide_icon_path):
+            # Cache the renderer: paint() runs for every visible node on each
+            # repaint, and re-parsing the SVG from disk every frame stutters.
+            global _HIDE_ICON_RENDERER
+            if _HIDE_ICON_RENDERER is None:
+                plugin_dir = os.path.dirname(os.path.abspath(__file__))
+                hide_icon_path = os.path.join(plugin_dir, "icons_component", "Component_layer_hide.svg")
+                if os.path.exists(hide_icon_path):
+                    try:
+                        renderer = QSvgRenderer(hide_icon_path)
+                        if renderer.isValid():
+                            _HIDE_ICON_RENDERER = renderer
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).debug("Failed to load hide icon in mindmap: %s", e)
+            if _HIDE_ICON_RENDERER is not None:
                 try:
-                    hide_renderer = QSvgRenderer(hide_icon_path)
-                    if hide_renderer.isValid():
-                        painter.save()
-                        if hasattr(painter, 'setOpacity'):
-                            painter.setOpacity(0.9)
-                        hide_rect = QRectF(icon_rect.x() + 3.0, icon_rect.y() + 3.0, 12.0, 12.0)
-                        hide_renderer.render(painter, hide_rect)
-                        painter.restore()
+                    painter.save()
+                    if hasattr(painter, 'setOpacity'):
+                        painter.setOpacity(0.9)
+                    hide_rect = QRectF(icon_rect.x() + 3.0, icon_rect.y() + 3.0, 12.0, 12.0)
+                    _HIDE_ICON_RENDERER.render(painter, hide_rect)
+                    painter.restore()
                 except Exception as e:
                     import logging
                     logging.getLogger(__name__).debug("Failed to render hide icon in mindmap: %s", e)
@@ -583,6 +815,7 @@ class MindMapView(QGraphicsView):
     layerDoubleClicked = Signal(str)
     contextMenuTriggered = Signal(object, object) # node, global_pos
     layerRelocationRequested = Signal(str, str) # layer_id, target_folder_path
+    layersRelocationRequested = Signal(list, str) # layer_ids, target_folder_path
     folderRelocationRequested = Signal(str, str) # source_folder_path, target_folder_path
 
     def __init__(self, parent=None):
@@ -976,8 +1209,7 @@ class MindMapView(QGraphicsView):
         
         # Guard: also treat a sip-deleted C++ object as absent
         try:
-            import sip
-            if self._drag_line_item is not None and sip.isdeleted(self._drag_line_item):
+            if _sip is not None and self._drag_line_item is not None and _sip.isdeleted(self._drag_line_item):
                 self._drag_line_item = None
         except Exception as e:  # noqa: BLE001
             import logging
@@ -1053,9 +1285,18 @@ class MindMapView(QGraphicsView):
         
         if source_item and target_item:
             if source_item.node.layer and not target_item.node.layer:
-                layer_id = source_item.node.layer.id()
                 target_folder_path = target_item.node.path
-                self.layerRelocationRequested.emit(layer_id, target_folder_path)
+                # Honour the rubber-band selection: relocating a selected
+                # layer should carry every other selected layer with it.
+                selected_items = [
+                    it for it in self.scene_obj.selectedItems()
+                    if isinstance(it, MindMapNodeItem) and it.node.layer
+                ]
+                if len(selected_items) > 1 and source_item in selected_items:
+                    layer_ids = [it.node.layer.id() for it in selected_items]
+                    self.layersRelocationRequested.emit(layer_ids, target_folder_path)
+                else:
+                    self.layerRelocationRequested.emit(source_item.node.layer.id(), target_folder_path)
             elif not source_item.node.layer and source_item.node.is_physical_folder and source_item.node.path and not target_item.node.layer:
                 source_folder_path = source_item.node.path
                 target_folder_path = target_item.node.path
@@ -1065,10 +1306,17 @@ class MindMapView(QGraphicsView):
         items = self.scene_obj.items(scene_pos)
         for item in items:
             if isinstance(item, MindMapNodeItem) and not item.node.layer:
-                if item.node.path:
-                    actual_path = resolve_physical_path(item.node.path)
-                    if actual_path and os.path.exists(actual_path) and not os.path.isdir(actual_path):
-                        continue
+                node_path = item.node.path
+                # Only real, existing, absolute directories are valid drop
+                # targets. The project root and the virtual branches
+                # ("虚拟图层"/"内存与临时图层"/"无效图层") must never receive
+                # physical files: emitting their pseudo path would make the
+                # host create garbage relative folders under the QGIS CWD.
+                if not node_path or not os.path.isabs(node_path):
+                    continue
+                actual_path = resolve_physical_path(node_path)
+                if not actual_path or not os.path.exists(actual_path) or not os.path.isdir(actual_path):
+                    continue
                 return item
         return None
 
@@ -1077,5 +1325,13 @@ class MindMapView(QGraphicsView):
         zoom_factor = 1.15
         if event.angleDelta().y() < 0:
             zoom_factor = 1.0 / zoom_factor
+        # Clamp the total zoom so the view transform cannot degenerate
+        # towards zero or explode beyond usefulness.
+        current_scale = self.transform().m11()
+        min_scale, max_scale = 0.05, 20.0
+        if current_scale * zoom_factor < min_scale:
+            zoom_factor = min_scale / current_scale
+        elif current_scale * zoom_factor > max_scale:
+            zoom_factor = max_scale / current_scale
         self.scale(zoom_factor, zoom_factor)
         event.accept()

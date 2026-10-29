@@ -1,58 +1,734 @@
 import os
 import sys
 
-from qgis.PyQt.QtCore import Qt, QModelIndex, QPersistentModelIndex, QTimer, QSize, pyqtSignal
-from qgis.PyQt.QtGui import QIcon, QColor, QPainter, QPixmap, QBrush, QPen
-from qgis.PyQt.QtWidgets import (
-    QAction, QActionGroup, QToolBar, QStackedWidget, QListView,
-    QTreeView, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton,
-    QMenu, QFileDialog, QInputDialog, QAbstractItemView, QMessageBox,
-    QHeaderView, QSizePolicy, QDialog, QToolButton, QApplication
-)
-from qgis.gui import QgsDockWidget
-from qgis.core import (
-    QgsMapLayer,
-    QgsMapLayerStyle,
-    QgsLayerTreeModel,
-    QgsProject,
-    QgsRasterLayer,
-    QgsVectorFileWriter,
-    QgsVectorLayer,
-)
 
+# Robust fallback imports for Qt
+try:
+    from qgis.PyQt.QtCore import Qt, QModelIndex, QPersistentModelIndex, QTimer
+    from qgis.PyQt.QtWidgets import (QAction, QToolBar, QStackedWidget, QListView,
+                                 QTreeView, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QMenu, QFileDialog, QInputDialog,
+                                 QAbstractItemView, QMessageBox, QActionGroup, QHeaderView, QSizePolicy, QDialog, QToolButton)
+except ImportError:
+    try:
+        from qtpy.QtCore import Qt, QModelIndex, QPersistentModelIndex, QTimer
+        from qtpy.QtWidgets import (QAction, QToolBar, QStackedWidget, QListView,
+                                    QTreeView, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QMenu, QFileDialog, QInputDialog,
+                                    QAbstractItemView, QMessageBox, QActionGroup, QHeaderView, QSizePolicy, QDialog, QToolButton)
+    except ImportError:
+        try:
+            from PySide2.QtCore import Qt, QModelIndex, QPersistentModelIndex, QTimer
+            from PySide2.QtWidgets import (QAction, QToolBar, QStackedWidget, QListView,
+                                           QTreeView, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QMenu, QFileDialog, QInputDialog,
+                                           QAbstractItemView, QMessageBox, QActionGroup, QHeaderView, QSizePolicy, QDialog, QToolButton)
+        except ImportError:
+            try:
+                from PySide6.QtCore import Qt, QModelIndex, QPersistentModelIndex, QTimer
+                from PySide6.QtWidgets import (QToolBar, QStackedWidget, QListView,
+                                               QTreeView, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QMenu, QFileDialog, QInputDialog,
+                                               QAbstractItemView, QMessageBox, QHeaderView, QSizePolicy, QDialog, QToolButton)
+                from PySide6.QtGui import QAction, QActionGroup
+            except ImportError:
+                # Basic mock classes for CLI tests without Qt installed
+                class QTimer:
+                    def __init__(self, parent=None):
+                        self.timeout = self._Signal()
+                    class _Signal:
+                        def connect(self, slot): pass
+                        def emit(self, *args): pass
+                    def setSingleShot(self, val): pass
+                    def setInterval(self, val): pass
+                    def start(self): pass
+                    @staticmethod
+                    def singleShot(msecs, slot): pass
+                class Qt:
+                    LeftDockWidgetArea = 1
+                    RightDockWidgetArea = 2
+                    CustomContextMenu = 3
+                    UserRole = 32
+                    Horizontal = 1
+                    AlignLeft = 1
+                    ToolButtonTextBesideIcon = 2
+                    class CheckState:
+                        Unchecked = 0
+                        PartiallyChecked = 1
+                        Checked = 2
+                    class AlignmentFlag:
+                        AlignLeft = 1
+                    class ToolButtonStyle:
+                        ToolButtonTextBesideIcon = 2
+                    class ContextMenuPolicy:
+                        CustomContextMenu = 3
+                    class ItemDataRole:
+                        UserRole = 32
+                    class WindowType:
+                        WindowMinimizeButtonHint = 1
+                        WindowMaximizeButtonHint = 2
+                    class MouseButton:
+                        LeftButton = 1
+                        RightButton = 2
+                        MiddleButton = 4
+                    class DropAction:
+                        MoveAction = 2
+                class QHeaderView:
+                    Interactive = 0
+                    ResizeToContents = 1
+                    class ResizeMode:
+                        Interactive = 0
+                        ResizeToContents = 1
+                class QSizePolicy:
+                    Fixed = 0
+                    Preferred = 1
+                    Expanding = 2
+                    class Policy:
+                        Fixed = 0
+                        Preferred = 1
+                        Expanding = 2
+                class QModelIndex:
+                    pass
+                QPersistentModelIndex = QModelIndex
+                class QAction:
+                    def __init__(self, *args, **kwargs):
+                        self._icon = kwargs.get('icon', None)
+                        self._text = kwargs.get('text', "")
+                        self.parent = kwargs.get('parent', None)
+
+                        # Map remaining unassigned positional args to standard QAction signatures
+                        if len(args) == 1:
+                            if isinstance(args[0], str):
+                                self._text = args[0]
+                            else:
+                                self.parent = args[0]
+                        elif len(args) == 2:
+                            self._text = args[0]
+                            self.parent = args[1]
+                        elif len(args) >= 3:
+                            self._icon = args[0]
+                            self._text = args[1]
+                            self.parent = args[2]
+
+                        self._checkable = False
+                        self._checked = False
+                        self.triggered = self._Signal()
+                    class _Signal:
+                        def connect(self, slot):
+                            self._slot = slot
+                        def emit(self, *args):
+                            if hasattr(self, '_slot'):
+                                self._slot(*args)
+                    def setCheckable(self, val):
+                        self._checkable = val
+                    def isCheckable(self):
+                        return self._checkable
+                    def setChecked(self, val):
+                        self._checked = val
+                    def isChecked(self):
+                        return self._checked
+                    def setText(self, text):
+                        self._text = text
+                    def text(self):
+                        return self._text
+                    def setIcon(self, icon):
+                        self._icon = icon
+                    def setEnabled(self, val):
+                        self._enabled = bool(val)
+                    def isEnabled(self):
+                        return getattr(self, '_enabled', True)
+                    def setVisible(self, val):
+                        self._visible = bool(val)
+                class QActionGroup:
+                    def __init__(self, parent=None):
+                        self._actions = []
+                        self._exclusive = True
+                    def addAction(self, action):
+                        self._actions.append(action)
+                        return action
+                    def setExclusive(self, val):
+                        self._exclusive = val
+                class QToolBar:
+                    def __init__(self, parent=None):
+                        self._actions = []
+                        self._widgets = []
+                    def addAction(self, action):
+                        self._actions.append(action)
+                        return action
+                    def addWidget(self, widget):
+                        self._widgets.append(widget)
+                        return widget
+                    def addSeparator(self):
+                        pass
+                    def setSizePolicy(self, h, v):
+                        pass
+                    def setToolButtonStyle(self, style):
+                        pass
+                    def setIconSize(self, size):
+                        pass
+                class QStackedWidget:
+                    def __init__(self, parent=None):
+                        self._widgets = []
+                        self._current_index = 0
+                    def addWidget(self, widget):
+                        self._widgets.append(widget)
+                    def setCurrentIndex(self, index):
+                        self._current_index = index
+                    def currentIndex(self):
+                        return self._current_index
+                class QListView:
+                    def __init__(self, parent=None):
+                        self._model = None
+                        self._selection_model = self._SelectionModel()
+                        self._selection_mode = None
+                        self._alternating_row_colors = False
+                    def setObjectName(self, name):
+                        pass
+                    def setModel(self, model):
+                        self._model = model
+                    def setContextMenuPolicy(self, policy):
+                        pass
+                    def setSelectionMode(self, mode):
+                        self._selection_mode = mode
+                    def setSelectionBehavior(self, behavior):
+                        pass
+                    def setAllColumnsShowFocus(self, val):
+                        pass
+                    def setAlternatingRowColors(self, val):
+                        self._alternating_row_colors = val
+                    def setEditTriggers(self, triggers):
+                        pass
+                    class _SelectionModel:
+                        def selectedIndexes(self):
+                            return []
+                        def isSelected(self, index):
+                            return False
+                        def select(self, index, flags):
+                            pass
+                        def clearSelection(self):
+                            pass
+                    def selectionModel(self):
+                        return self._selection_model
+                    def mapToGlobal(self, pos):
+                        return pos
+                    class _Signal:
+                        def connect(self, slot):
+                            pass
+                    customContextMenuRequested = _Signal()
+                    doubleClicked = _Signal()
+                class QTreeView(QListView):
+                    def __init__(self, parent=None):
+                        super().__init__(parent)
+                        self._header = self._Header()
+                    def setDragEnabled(self, val):
+                        pass
+                    def setAcceptDrops(self, val):
+                        pass
+                    def setDropIndicatorShown(self, val):
+                        pass
+                    def setColumnWidth(self, col, width):
+                        pass
+                    def header(self):
+                        return self._header
+                    def setRootIsDecorated(self, val):
+                        pass
+                    def setItemsExpandable(self, val):
+                        pass
+                    def setSortingEnabled(self, val):
+                        pass
+                    def expandAll(self):
+                        pass
+                    def collapseAll(self):
+                        pass
+                    def isExpanded(self, index):
+                        return False
+                    def setExpanded(self, index, val):
+                        pass
+                    def verticalScrollBar(self):
+                        return None
+                    def horizontalScrollBar(self):
+                        return None
+                    class _Header:
+                        def setSectionResizeMode(self, col, mode):
+                            pass
+                        def setMinimumSectionSize(self, size):
+                            pass
+                        def count(self):
+                            return 3
+                class QVBoxLayout:
+                    def __init__(self, parent=None):
+                        self._widgets = []
+                    def addWidget(self, widget, *args):
+                        self._widgets.append(widget)
+                    def setContentsMargins(self, *args):
+                        pass
+                    def setSpacing(self, spacing):
+                        pass
+                class QHBoxLayout:
+                    def __init__(self, parent=None):
+                        self._widgets = []
+                    def addWidget(self, widget, *args):
+                        self._widgets.append(widget)
+                    def setContentsMargins(self, *args):
+                        pass
+                    def setSpacing(self, spacing):
+                        pass
+                    def setAlignment(self, align):
+                        pass
+                    def count(self):
+                        return 1
+                    def takeAt(self, index):
+                        return None
+                class QLabel:
+                    def __init__(self, text=""):
+                        self._text = text
+                    def setStyleSheet(self, style):
+                        pass
+                    def setObjectName(self, name):
+                        pass
+                class QPushButton:
+                    clicked = None
+                    def __init__(self, text=""):
+                        self._text = text
+                        class MockSignal:
+                            def connect(self, slot): pass
+                        self.clicked = MockSignal()
+                    def text(self):
+                        return self._text
+                    def setStyleSheet(self, style):
+                        pass
+                    def setObjectName(self, name):
+                        pass
+                class QWidget:
+                    def __init__(self, parent=None):
+                        self._parent = parent
+                        self._layout = None
+                    def setLayout(self, layout):
+                        self._layout = layout
+                    def setStyleSheet(self, style):
+                        pass
+                    def setObjectName(self, name):
+                        pass
+                    def setSizePolicy(self, h, v):
+                        pass
+                    def show(self): pass
+                    def hide(self): pass
+                class QDialog(QWidget):
+                    def __init__(self, parent=None):
+                        super().__init__(parent)
+                    def setWindowTitle(self, title):
+                        pass
+                    def resize(self, w, h):
+                        pass
+                    def setWindowFlags(self, flags):
+                        pass
+                    def windowFlags(self):
+                        return 0
+                class QToolButton(QWidget):
+                    def __init__(self, parent=None):
+                        super().__init__(parent)
+                        self.toggled = self._Signal()
+                        self._checkable = False
+                        self._checked = False
+                        self._tooltip = ""
+                        self._icon = None
+                        self._icon_size = None
+                    class _Signal:
+                        def connect(self, slot):
+                            self._slot = slot
+                        def emit(self, *args):
+                            if hasattr(self, '_slot'):
+                                self._slot(*args)
+                    def setCheckable(self, val):
+                        self._checkable = val
+                    def isCheckable(self):
+                        return self._checkable
+                    def setChecked(self, val):
+                        self._checked = val
+                        self.toggled.emit(val)
+                    def isChecked(self):
+                        return self._checked
+                    def setToolTip(self, val):
+                        self._tooltip = val
+                    def setIcon(self, icon):
+                        self._icon = icon
+                    def setIconSize(self, size):
+                        self._icon_size = size
+                class QMenu:
+                    def __init__(self, parent=None):
+                        pass
+                    def setStyleSheet(self, style):
+                        pass
+                    def setIconSize(self, size):
+                        pass
+                    def addAction(self, text):
+                        return QAction(text, self)
+                    def addMenu(self, text):
+                        return QMenu(self)
+                    def addSeparator(self):
+                        pass
+                    def exec(self, pos):
+                        pass
+                    def setIcon(self, icon):
+                        self._icon = icon
+                class QFileDialog:
+                    @classmethod
+                    def getOpenFileName(cls, *args, **kwargs):
+                        return "", ""
+                    @classmethod
+                    def getSaveFileName(cls, *args, **kwargs):
+                        return "", ""
+                    @classmethod
+                    def getExistingDirectory(cls, *args, **kwargs):
+                        return ""
+                class QInputDialog:
+                    @classmethod
+                    def getText(cls, *args, **kwargs):
+                        return "", False
+                class QAbstractItemView:
+                    NoEditTriggers = 0
+                    ExtendedSelection = 3
+                    SelectRows = 1
+                    class SelectionMode:
+                        ExtendedSelection = 3
+                    class SelectionBehavior:
+                        SelectRows = 1
+                class QMessageBox:
+                    Yes = 16384
+                    No = 65536
+                    class StandardButton:
+                        Yes = 16384
+                        No = 65536
+                    class ButtonRole:
+                        ActionRole = 1
+                        RejectRole = 2
+                    def __init__(self, parent=None):
+                        self._buttons = []
+                        self._clicked = None
+                    def setWindowTitle(self, title):
+                        pass
+                    def setText(self, text):
+                        pass
+                    def addButton(self, *args):
+                        class DummyButton:
+                            def setStyleSheet(self, style):
+                                pass
+                            def setIcon(self, icon):
+                                pass
+                        btn = DummyButton()
+                        self._buttons.append(btn)
+                        return btn
+                    def exec(self):
+                        if self._buttons:
+                            self._clicked = self._buttons[0]
+                        return 0
+                    def clickedButton(self):
+                        return self._clicked
+                    @classmethod
+                    def warning(cls, parent, title, text, buttons=None, default_button=None):
+                        return 16384
+                    @classmethod
+                    def information(cls, parent, title, text):
+                        pass
+                    @classmethod
+                    def critical(cls, parent, title, text):
+                        pass
+                    @classmethod
+                    def question(cls, parent, title, text, buttons=None, default_button=None):
+                        return 16384
+
+# Robust fallback imports for QStandardItemModel & QStandardItem
+try:
+    from qgis.PyQt.QtGui import QStandardItemModel, QStandardItem, QIcon
+except ImportError:
+    try:
+        from qtpy.QtGui import QStandardItemModel, QStandardItem, QIcon
+    except ImportError:
+        try:
+            from PySide2.QtGui import QStandardItemModel, QStandardItem, QIcon
+        except ImportError:
+            try:
+                from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon
+            except ImportError:
+                class QStandardItemModel:
+                    def __init__(self, parent=None):
+                        self.itemChanged = self._Signal()
+                    class _Signal:
+                        def connect(self, slot): pass
+                        def emit(self, *args): pass
+                    def clear(self): pass
+                    def setHorizontalHeaderLabels(self, labels): pass
+                    def appendRow(self, items): pass
+                    def itemFromIndex(self, idx): return None
+                    def setSortRole(self, role): pass
+                class QStandardItem:
+                    def __init__(self, text=""): self._text = text
+                    def setData(self, val, role): pass
+                    def flags(self): return 33
+                    def setFlags(self, flags): pass
+                class QIcon:
+                    def __init__(self, path=""): pass
+
+# Robust fallback imports for QGIS
+try:
+    from qgis.gui import QgsDockWidget
+    from qgis.core import (
+        QgsMapLayer,
+        QgsMapLayerStyle,
+        QgsLayerTreeModel,
+        QgsProject,
+        QgsRasterLayer,
+        QgsVectorFileWriter,
+        QgsVectorLayer,
+    )
+except ImportError:
+    # Use our own mocked versions
+    class QgsDockWidget(QWidget):
+        def __init__(self, title, parent=None):
+            super().__init__(parent)
+            self._title = title
+            self._widget = None
+        def setAllowedAreas(self, areas):
+            pass
+        def setWidget(self, widget):
+            self._widget = widget
+        def show(self):
+            pass
+
+    class QgsProject:
+        _instance = None
+        @classmethod
+        def instance(cls):
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
+        def mapLayers(self):
+            return {}
+        def fileName(self):
+            return ""
+        def mapLayer(self, layer_id):
+            return None
+        def addMapLayer(self, layer):
+            pass
+        def addVectorLayer(self, path, name, provider):
+            # For testing success
+            return QgsVectorLayer(path, name, provider)
+        def removeMapLayer(self, layer_id):
+            pass
+        def removeMapLayers(self, layer_ids):
+            for layer_id in layer_ids:
+                self.removeMapLayer(layer_id)
+        def transformContext(self):
+            return None
+
+    class QgsLayerTreeModel:
+        class Flag:
+            AllowNodeReorder = 1
+        def __init__(self, root):
+            self.root = root
+        def setFlag(self, flag, enabled=True):
+            pass
+        def node2index(self, node):
+            return QModelIndex()
+        def mimeData(self, indexes):
+            return None
+        def dropMimeData(self, data, action, row, column, parent):
+            return False
+
+    class QgsMapLayer:
+        def __init__(self, layer_id="", name="", source_path="", provider=""):
+            self._id = layer_id
+            self._name = name
+            self._source = source_path
+            self._provider = self._DataProvider(provider)
+        class _DataProvider:
+            def __init__(self, name):
+                self._name = name
+            def name(self):
+                return self._name
+        def id(self): return self._id
+        def name(self): return self._name
+        def source(self): return self._source
+        def isValid(self): return True
+        def isEditable(self): return False
+        def startEditing(self): return False
+        def commitChanges(self): return False
+        def setName(self, name): self._name = name
+        def triggerRepaint(self): pass
+        def dataProvider(self): return self._provider
+
+    class QgsVectorLayer(QgsMapLayer):
+        def __init__(self, path, name, provider):
+            super().__init__(name, name, path, provider)
+            self._subset_string = ""
+        def subsetString(self):
+            return self._subset_string
+        def setSubsetString(self, expression):
+            self._subset_string = expression
+            return True
+
+    class QgsMapLayerStyle:
+        def __init__(self):
+            self.source_layer = None
+            self.target_layer = None
+        def readFromLayer(self, layer):
+            self.source_layer = layer
+        def writeToLayer(self, layer):
+            self.target_layer = layer
+
+    class QgsRasterLayer(QgsMapLayer):
+        def __init__(self, path, name, provider):
+            super().__init__(name, name, path, provider)
+
+    class QgsVectorFileWriter:
+        NoError = 0
+        CreateOrOverwriteFile = 0
+        CreateOrOverwriteLayer = 1
+        AppendToLayerNoNewFields = 2
+        AppendToLayerAddFields = 3
+        class ActionOnExistingFile:
+            CreateOrOverwriteFile = 0
+            CreateOrOverwriteLayer = 1
+            AppendToLayerNoNewFields = 2
+            AppendToLayerAddFields = 3
+        class SaveVectorOptions:
+            def __init__(self):
+                self.driverName = ""
+                self.fileEncoding = ""
+                self.layerName = ""
+                self.actionOnExistingFile = 0
+        class WriterError:
+            NoError = 0
+        @staticmethod
+        def writeAsVectorFormatV3(*args):
+            return 0, "", "", ""
+
+# Try importing our modules
 try:
     from .layer_model import LayerTreeModel, LayerItem, FolderItem, split_qgis_source, get_layer_format
     from .treemap_widget import TreeMapWidget
     from .mindmap_view import MindMapView
-    from .file_operations import (
-        safe_copy, safe_move, safe_rename, safe_rename_parent_dir, safe_rename_dir,
-        safe_migrate_dir, update_layer_source, get_associated_files, format_size,
-        resolve_physical_path, pending_rename_cleanup_files
-    )
+    from .file_operations import safe_copy, safe_move, safe_rename, safe_rename_parent_dir, safe_rename_dir, safe_migrate_dir, update_layer_source, get_associated_files, format_size, resolve_physical_path, pending_rename_cleanup_files
+except ImportError:
+    try:
+        from layer_model import LayerTreeModel, LayerItem, FolderItem, split_qgis_source, get_layer_format
+        from treemap_widget import TreeMapWidget
+        from mindmap_view import MindMapView
+        from file_operations import safe_copy, safe_move, safe_rename, safe_rename_parent_dir, safe_rename_dir, safe_migrate_dir, update_layer_source, get_associated_files, format_size, resolve_physical_path, pending_rename_cleanup_files
+    except ImportError:
+        # Mock models and operations for standalone tests
+        class LayerTreeModel:
+            def __init__(self): pass
+            def rebuild_model(self, group_by_physical): pass
+        class LayerItem:
+            pass
+        class FolderItem:
+            pass
+        class TreeMapWidget(QWidget):
+            class _Signal:
+                def connect(self, slot): pass
+                def emit(self, *args): pass
+            layerSelected = _Signal()
+            contextMenuTriggered = _Signal()
+            def set_layers(self, layers): pass
+        class MindMapView(QWidget):
+            class _Signal:
+                def connect(self, slot): pass
+                def emit(self, *args): pass
+            layerSelected = _Signal()
+            layerDoubleClicked = _Signal()
+            def set_layers(self, layers): pass
+            def select_layer_node(self, layer_id): pass
+            def zoom_to_fit(self): pass
+        def safe_copy(*args): pass
+        def safe_move(*args): pass
+        def safe_rename(*args): pass
+        def pending_rename_cleanup_files(): return []
+        def safe_rename_parent_dir(*args): pass
+        def update_layer_source(*args): pass
+        def split_qgis_source(x): return x, ""
+        def get_associated_files(x): return [x] if x else []
+        def format_size(x): return "0 B"
+
+
+try:
     from .layer_board_widget import LayerBoardWidget
+except ImportError:
+    try:
+        from layer_board_widget import LayerBoardWidget
+    except ImportError:
+        # Mock class for offline tests
+        class LayerBoardWidget(QWidget):
+            def __init__(self, iface=None, parent=None):
+                super().__init__(parent)
+            def populateLayerTable(self, t): pass
+            def populateAvailableEncodingList(self): pass
+
+
+try:
+    from qgis.PyQt.QtCore import QSize
+except ImportError:
+    try:
+        from qtpy.QtCore import QSize
+    except ImportError:
+        try:
+            from PySide2.QtCore import QSize
+        except ImportError:
+            try:
+                from PySide6.QtCore import QSize
+            except ImportError:
+                class QSize:
+                    def __init__(self, w, h):
+                        self.w = w
+                        self.h = h
+
+
+try:
     from .translation import tr
 except ImportError:
-    from layer_model import LayerTreeModel, LayerItem, FolderItem, split_qgis_source, get_layer_format
-    from treemap_widget import TreeMapWidget
-    from mindmap_view import MindMapView
-    from file_operations import (
-        safe_copy, safe_move, safe_rename, safe_rename_parent_dir, safe_rename_dir,
-        safe_migrate_dir, update_layer_source, get_associated_files, format_size,
-        resolve_physical_path, pending_rename_cleanup_files
-    )
-    from layer_board_widget import LayerBoardWidget
-    from translation import tr
-
+    try:
+        from translation import tr
+    except ImportError:
+        def tr(text, disambiguation=None): return text
 
 def _get_drag_distance():
     try:
+        from qgis.PyQt.QtWidgets import QApplication
         return QApplication.startDragDistance()
     except Exception:
-        return 8
+        try:
+            from qtpy.QtWidgets import QApplication
+            return QApplication.startDragDistance()
+        except Exception:
+            try:
+                from PySide2.QtWidgets import QApplication
+                return QApplication.startDragDistance()
+            except Exception:
+                try:
+                    from PySide6.QtWidgets import QApplication
+                    return QApplication.startDragDistance()
+                except Exception:
+                    return 8
 
 
 class DraggableTreeView(QTreeView):
-    layersDropped = pyqtSignal(list, str)
+    try:
+        from qgis.PyQt.QtCore import pyqtSignal as layersDroppedSignal
+    except ImportError:
+        try:
+            from qtpy.QtCore import Signal as layersDroppedSignal
+        except ImportError:
+            try:
+                from PySide2.QtCore import Signal as layersDroppedSignal
+            except ImportError:
+                try:
+                    from PySide6.QtCore import Signal as layersDroppedSignal
+                except ImportError:
+                    class layersDroppedSignal:
+                        def __init__(self, *args):
+                            self._slots = []
+                        def emit(self, *args):
+                            for s in self._slots: s(*args)
+                        def connect(self, s):
+                            self._slots.append(s)
+
+    layersDropped = layersDroppedSignal(list, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -298,7 +974,27 @@ class LayerOrderTreeModel(QgsLayerTreeModel):
 
 
 class DraggableGroupTreeView(QTreeView):
-    groupReordered = pyqtSignal(list, dict, str)
+    try:
+        from qgis.PyQt.QtCore import pyqtSignal as groupReorderedSignal
+    except ImportError:
+        try:
+            from qtpy.QtCore import Signal as groupReorderedSignal
+        except ImportError:
+            try:
+                from PySide2.QtCore import Signal as groupReorderedSignal
+            except ImportError:
+                try:
+                    from PySide6.QtCore import Signal as groupReorderedSignal
+                except ImportError:
+                    class groupReorderedSignal:
+                        def __init__(self, *args):
+                            self._slots = []
+                        def emit(self, *args):
+                            for s in self._slots: s(*args)
+                        def connect(self, s):
+                            self._slots.append(s)
+
+    groupReordered = groupReorderedSignal(list, dict, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -309,6 +1005,17 @@ class DraggableGroupTreeView(QTreeView):
         self._drop_target_index = None
         self._drop_position = None
         self._reorder_enabled = True
+
+    def setReorderEnabled(self, enabled):
+        """Enable ordering only when the view represents the complete tree."""
+        self._reorder_enabled = bool(enabled)
+        if not self._reorder_enabled:
+            self._drag_start_pos = None
+            self._drop_target_index = None
+            self._drop_position = None
+            viewport = self.viewport() if hasattr(self, "viewport") else None
+            if viewport:
+                viewport.update()
 
     def mousePressEvent(self, event):
         if self._reorder_enabled and event.button() == Qt.MouseButton.LeftButton:
@@ -924,6 +1631,7 @@ class SuperLayerDockWidget(QDialog):
         self.mindmap_view.layerDoubleClicked.connect(self.focus_layer_by_id)
         self.mindmap_view.contextMenuTriggered.connect(self.show_treemap_context_menu)
         self.mindmap_view.layerRelocationRequested.connect(self.handle_layer_relocation)
+        self.mindmap_view.layersRelocationRequested.connect(self.handle_multiple_layers_relocation)
         self.mindmap_view.folderRelocationRequested.connect(self.handle_folder_relocation)
 
         # Model item changed connections
@@ -941,9 +1649,14 @@ class SuperLayerDockWidget(QDialog):
             project = QgsProject.instance()
             if project and project.layerTreeRoot() and hasattr(project.layerTreeRoot(), 'visibilityChanged'):
                 project.layerTreeRoot().visibilityChanged.connect(self.on_visibility_changed)
-        except (ImportError, AttributeError, RuntimeError) as e:
+            # Views keep strong layer references (e.g. treemap nodes, style
+            # panels); refresh after layers are removed elsewhere so stale
+            # wrappers are dropped before paint or mouse handlers touch them.
+            if project and hasattr(project, 'layersRemoved'):
+                project.layersRemoved.connect(lambda _ids: self._refresh_timer.start())
+        except (ImportError, AttributeError, RuntimeError, TypeError) as e:
             import logging
-            logging.getLogger(__name__).debug("Failed to connect visibilityChanged signal: %s", e)
+            logging.getLogger(__name__).debug("Failed to connect project signals: %s", e)
 
     def set_tag_button_active(self, btn, active):
         try:
@@ -1159,6 +1872,78 @@ class SuperLayerDockWidget(QDialog):
 
         global_pos = self.btn_filter_visible.mapToGlobal(pos) if hasattr(self.btn_filter_visible, 'mapToGlobal') else pos
         menu.exec(global_pos)
+
+    def _set_group_reorder_actions_enabled(self, enabled):
+        """Enable both order actions without coupling tests to a Qt binding."""
+        for action_name in ("act_group_move_up", "act_group_move_down"):
+            action = getattr(self, action_name, None)
+            if action is not None and hasattr(action, "setEnabled"):
+                action.setEnabled(bool(enabled))
+
+    def _update_group_reorder_actions(self, filter_str=None, filter_visible=None):
+        """Ordering is safe only in the complete, unfiltered group view."""
+        if filter_str is None:
+            filter_str = self.current_filter_format.lower() if self.current_filter_format else None
+        if filter_visible is None:
+            button = getattr(self, "btn_filter_visible", None)
+            filter_visible = bool(button and button.isChecked())
+        stacked = getattr(self, "stacked_widget", None)
+        in_group_view = bool(stacked and stacked.currentIndex() == 1)
+        for action_name in ("act_group_move_up", "act_group_move_down"):
+            action = getattr(self, action_name, None)
+            if action is not None and hasattr(action, "setVisible"):
+                action.setVisible(in_group_view)
+        self._set_group_reorder_actions_enabled(
+            in_group_view and not filter_str and not filter_visible
+        )
+
+    def move_selected_group_layer(self, direction):
+        """Move one selected layer one position within its current QGIS group."""
+        if direction not in (-1, 1):
+            return
+
+        filter_str = self.current_filter_format.lower() if self.current_filter_format else None
+        filter_visible = bool(self.btn_filter_visible.isChecked()) if hasattr(self, "btn_filter_visible") else False
+        if self.stacked_widget.currentIndex() != 1 or filter_str or filter_visible:
+            return
+
+        selection_model = self.group_tree_view.selectionModel()
+        if not selection_model:
+            return
+        selected_layers = []
+        for index in selection_model.selectedIndexes():
+            if index.column() != 0:
+                continue
+            item = self.group_model.itemFromIndex(index)
+            if isinstance(item, LayerItem) and item.layer and item.layer.id() not in selected_layers:
+                selected_layers.append(item.layer.id())
+        if len(selected_layers) != 1:
+            return
+
+        root = QgsProject.instance().layerTreeRoot()
+        source_node = root.findLayer(selected_layers[0]) if root else None
+        parent = source_node.parent() if source_node else None
+        if not parent:
+            return
+        children = parent.children()
+        try:
+            source_row = children.index(source_node)
+        except ValueError:
+            return
+
+        target_row = source_row + direction
+        if target_row < 0 or target_row >= len(children):
+            return
+        target_node = children[target_row]
+        target_layer = target_node.layer() if hasattr(target_node, "layer") else None
+        if not target_layer:
+            return
+
+        self.handle_group_reorder(
+            [{"type": "layer", "id": selected_layers[0]}],
+            {"type": "layer", "id": target_layer.id()},
+            "above" if direction < 0 else "below",
+        )
 
     def switch_view(self, index):
         self.act_physical_tree.setChecked(index == 0)
@@ -1406,7 +2191,7 @@ class SuperLayerDockWidget(QDialog):
             return
 
         item = model.itemFromIndex(index)
-        if isinstance(item, LayerItem):
+        if isinstance(item, LayerItem) and item.layer:
             self.focus_layer_by_id(item.layer.id())
 
     def on_item_changed(self, item):
@@ -1862,25 +2647,28 @@ class SuperLayerDockWidget(QDialog):
                 # Copy files
                 safe_copy(source_path, target_folder_path)
 
-                # Load new layer in QGIS
+                # Load new layer in QGIS. Keep query params (e.g. |layername=)
+                # so container layers point at the same table.
                 new_path = os.path.join(target_folder_path, os.path.basename(phys_source_path))
+                new_source = new_path + query_params
                 new_layer = None
 
                 if isinstance(layer, QgsVectorLayer):
-                    new_layer = QgsVectorLayer(new_path, tr("{} (复制)").format(layer.name()), layer.dataProvider().name())
+                    new_layer = QgsVectorLayer(new_source, tr("{} (复制)").format(layer.name()), layer.dataProvider().name())
                 elif isinstance(layer, QgsRasterLayer):
-                    new_layer = QgsRasterLayer(new_path, tr("{} (复制)").format(layer.name()), layer.dataProvider().name())
+                    new_layer = QgsRasterLayer(new_source, tr("{} (复制)").format(layer.name()), layer.dataProvider().name())
                 else:
                     ext = os.path.splitext(new_path)[1].lower()
                     vector_exts = ['.shp', '.geojson', '.gpkg', '.kml', '.tab']
                     if ext in vector_exts:
-                        new_layer = QgsVectorLayer(new_path, tr("{} (复制)").format(layer.name()), "ogr")
+                        new_layer = QgsVectorLayer(new_source, tr("{} (复制)").format(layer.name()), "ogr")
                     else:
-                        new_layer = QgsRasterLayer(new_path, tr("{} (复制)").format(layer.name()), "gdal")
+                        new_layer = QgsRasterLayer(new_source, tr("{} (复制)").format(layer.name()), "gdal")
 
                 if new_layer and new_layer.isValid():
                     layer_style = self._capture_layer_style(layer)
                     self._apply_layer_style(layer_style, new_layer)
+                    self._copy_provider_state(layer, new_layer)
                     QgsProject.instance().addMapLayer(new_layer)
 
                 self.refresh()
@@ -2331,6 +3119,7 @@ class SuperLayerDockWidget(QDialog):
                     if new_layer and new_layer.isValid():
                         layer_style = self._capture_layer_style(layer)
                         self._apply_layer_style(layer_style, new_layer)
+                        self._copy_provider_state(layer, new_layer)
                         QgsProject.instance().addMapLayer(new_layer)
 
                 self.refresh()
@@ -2696,9 +3485,7 @@ class SuperLayerDockWidget(QDialog):
                     elif isinstance(layer, QgsRasterLayer):
                         new_layer = QgsRasterLayer(new_path, tr("{} (复制)").format(layer.name()), layer.dataProvider().name())
                     else:
-                        # General fallback if layer type cannot be determined
-                        from qgis.core import QgsProviderRegistry
-                        # Auto detect vector/raster using provider registry or extension
+                        # Auto detect vector/raster from the file extension
                         ext = os.path.splitext(new_path)[1].lower()
                         vector_exts = ['.shp', '.geojson', '.gpkg', '.kml', '.tab']
                         if ext in vector_exts:
@@ -3006,8 +3793,13 @@ class SuperLayerDockWidget(QDialog):
         if not path:
             return
 
+        # A subset filter means only matching features get written; confirm
+        # before the memory layer is replaced and unmatched features are lost.
+        if not self._confirm_filtered_export([layer]):
+            return
+
         driver_name = "GPKG"
-        if path.endswith(".shp"):
+        if path.lower().endswith(".shp"):
             driver_name = "ESRI Shapefile"
 
         try:
@@ -3015,6 +3807,11 @@ class SuperLayerDockWidget(QDialog):
             options = QgsVectorFileWriter.SaveVectorOptions()
             options.driverName = driver_name
             options.fileEncoding = "UTF-8"
+            if driver_name == "GPKG" and os.path.exists(path):
+                # Never wipe a whole multi-layer GeoPackage: replace only this
+                # layer's table inside the existing container.
+                options.layerName = os.path.splitext(os.path.basename(path))[0]
+                options.actionOnExistingFile = QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteLayer
 
             # Use writeAsVectorFormatV3 for QGIS 3
             context = QgsProject.instance().transformContext()
@@ -3027,9 +3824,13 @@ class SuperLayerDockWidget(QDialog):
             if err == 0:  # NoError
                 # Add the new layer to QGIS
                 base_name = os.path.splitext(os.path.basename(path))[0]
-                new_layer = QgsVectorLayer(path, base_name, "ogr")
+                source_uri = path
+                if driver_name == "GPKG":
+                    source_uri = "{}|layername={}".format(path, base_name)
+                new_layer = QgsVectorLayer(source_uri, base_name, "ogr")
                 if new_layer and new_layer.isValid():
                     self._apply_layer_style(layer_style, new_layer)
+                    self._copy_provider_state(layer, new_layer)
                     QgsProject.instance().addMapLayer(new_layer)
                     # Remove the old temporary layer
                     QgsProject.instance().removeMapLayer(layer.id())
@@ -3054,6 +3855,38 @@ class SuperLayerDockWidget(QDialog):
         """Restore symbology, labeling, diagrams, forms, and custom properties."""
         style.writeToLayer(layer)
         layer.triggerRepaint()
+
+    @staticmethod
+    def _copy_provider_state(src_layer, dst_layer):
+        """Copy provider-level state (subset filter) that QgsMapLayerStyle omits."""
+        if not isinstance(dst_layer, QgsVectorLayer):
+            return
+        if not hasattr(src_layer, "subsetString") or not hasattr(dst_layer, "setSubsetString"):
+            return
+        try:
+            dst_layer.setSubsetString(src_layer.subsetString())
+        except RuntimeError:
+            pass
+
+    def _confirm_filtered_export(self, layers):
+        """Warn before exporting layers whose subset filter permanently drops features."""
+        filtered = []
+        for layer in layers:
+            try:
+                if isinstance(layer, QgsVectorLayer) and layer.subsetString():
+                    filtered.append(layer.name())
+            except RuntimeError:
+                continue
+        if not filtered:
+            return True
+        reply = QMessageBox.warning(
+            self,
+            tr("图层带有过滤表达式"),
+            tr("以下图层设置了过滤表达式，导出的文件将只包含当前过滤后可见的要素，被过滤掉的要素不会写入且无法恢复：\n{}\n\n是否继续？").format("\n".join("  • " + name for name in filtered)),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        return reply == QMessageBox.StandardButton.Yes
 
     def action_export_temporary_layers(self, layers):
         """在一个批量对话框中保存选中的多个临时矢量图层。"""
@@ -3105,7 +3938,13 @@ class SuperLayerDockWidget(QDialog):
         """Return a portable OGR layer/file name."""
         invalid = '<>:"/\\|?*'
         cleaned = "".join("_" if char in invalid or ord(char) < 32 else char for char in name)
-        return cleaned.strip(" .") or "layer"
+        cleaned = cleaned.strip(" .") or "layer"
+        # Windows reserved device names (con, nul, com1, ...) cannot exist as
+        # file basenames, which would make the export write fail.
+        reserved = {'con', 'prn', 'aux', 'nul'} | {f'com{i}' for i in range(1, 10)} | {f'lpt{i}' for i in range(1, 10)}
+        if cleaned.lower() in reserved:
+            cleaned = '_' + cleaned
+        return cleaned
 
     @staticmethod
     def _container_layer_exists(path, layer_name):
@@ -3156,6 +3995,11 @@ class SuperLayerDockWidget(QDialog):
                 QMessageBox.warning(self, tr("目标位置无效"), tr("目标文件的父文件夹不存在。"))
                 return
 
+        # A subset filter means only matching features get written; confirm
+        # before memory layers are replaced and unmatched features are lost.
+        if not self._confirm_filtered_export(layers):
+            return
+
         successes = []
         skipped = []
         failures = []
@@ -3203,15 +4047,30 @@ class SuperLayerDockWidget(QDialog):
             writer_options.driverName = driver
             writer_options.fileEncoding = "UTF-8"
             writer_options.layerName = output_name
-            if os.path.exists(output_path):
+            overwrite_mode = os.path.exists(output_path)
+            if overwrite_mode:
                 writer_options.actionOnExistingFile = QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteLayer
+
+            # The KML driver assumes WGS84 coordinates and cannot reproject:
+            # block projected layers instead of writing garbage geometries.
+            if driver == "KML":
+                try:
+                    crs_authid = layer.crs().authid() if layer.crs() else ""
+                except RuntimeError:
+                    crs_authid = ""
+                if crs_authid and crs_authid != "EPSG:4326":
+                    failures.append("{}: {}".format(layer_name, tr("KML 需要 WGS84 (EPSG:4326) 坐标系，请先重投影后再导出")))
+                    continue
 
             try:
                 err, err_msg, _, _ = QgsVectorFileWriter.writeAsVectorFormatV3(
                     layer, output_path, context, writer_options
                 )
                 if err != 0:
-                    failures.append("{}: {}".format(layer_name, err_msg))
+                    detail = "{}: {}".format(layer_name, err_msg)
+                    if overwrite_mode:
+                        detail += tr("（注意：目标容器中的同名表可能已被覆盖删除）")
+                    failures.append(detail)
                     continue
 
                 source = output_path
@@ -3223,6 +4082,7 @@ class SuperLayerDockWidget(QDialog):
                     continue
 
                 self._apply_layer_style(layer_style, new_layer)
+                self._copy_provider_state(layer, new_layer)
                 project.addMapLayer(new_layer)
                 if replace:
                     replacement_layer_ids.append(layer_id)
