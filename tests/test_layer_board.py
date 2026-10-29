@@ -255,8 +255,7 @@ class TestLayerBoardWidget(unittest.TestCase):
         mock_vlayer.toggleScaleBasedVisibility.assert_called_with(True)
         mock_vlayer.setMaximumScale.assert_called_with(5000.0)
         mock_vlayer.setMinimumScale.assert_called_with(100000.0)
-        mock_vlayer.writeLayerXML.assert_called_once()
-        mock_vlayer.readLayerXML.assert_called_once()
+        mock_vlayer.setDataSource.assert_called_with('new_uri', 'OldName', 'ogr')
         mock_vlayer.reload.assert_called_once()
         
         # Verify project dirty flag set

@@ -79,14 +79,16 @@ def _qt_immediate_delete(obj):
     """
     # --- sip-based bindings (PyQt5 / PyQt6) ---
     for _loader in (
-        lambda: __import__('qgis.PyQt', fromlist=['sip']).sip,
+        lambda: getattr(__import__('qgis.PyQt', fromlist=['sip']), 'sip', None),
         lambda: __import__('PyQt6.sip', fromlist=['sip']),
         lambda: __import__('sip'),
         lambda: __import__('PyQt5.sip', fromlist=['sip']),
     ):
         try:
             _mod = _loader()
-        except ImportError:
+            if _mod is None:
+                continue
+        except (ImportError, AttributeError):
             continue
         try:
             if not _mod.isdeleted(obj):

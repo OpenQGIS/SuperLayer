@@ -1085,7 +1085,7 @@ class TestDockWidget(unittest.TestCase):
             mock_project.addMapLayer.assert_called_once()
             added_layer = mock_project.addMapLayer.call_args[0][0]
             self.assertTrue(isinstance(added_layer, QgsVectorLayer))
-            self.assertEqual(added_layer.source(), "/mock/temp_saved.gpkg")
+            self.assertEqual(added_layer.source(), "/mock/temp_saved.gpkg|layername=temp_saved")
             self.assertEqual(added_layer.name(), "temp_saved")
             
             mock_project.removeMapLayer.assert_called_once_with("temp_layer_id")
@@ -1225,6 +1225,7 @@ class TestDockWidget(unittest.TestCase):
                 if removed["value"] else "roads"
             )
             layer.id.return_value = "temporary-roads"
+            layer.subsetString.return_value = ""
 
             project = MagicMock()
             project.transformContext.return_value = None
